@@ -49,20 +49,13 @@ export default function Workspace({ project, team }) {
     <div className="h-screen flex overflow-hidden bg-[var(--bg)]">
       {/* ── Sidebar ────────────────────────────────────── */}
       <aside
-        className={`${sw} shrink-0 flex flex-col border-r border-[var(--bd)] bg-[var(--bg2)] transition-[width] duration-200 overflow-hidden`}
+        className={`${sw} shrink-0 flex flex-col border-r border-[var(--card-border)] transition-[width] duration-200 overflow-hidden`}
+        style={{ background: 'var(--bg2)', backdropFilter: 'blur(10px)' }}
         aria-label="Главная навигация"
       >
         {/* Logo + project */}
-        <div className={`flex flex-col ${collapsed ? 'items-center py-3' : 'px-4 py-4'} border-b border-[var(--bd)] shrink-0`}>
-          <span
-            className="text-[20px] font-bold leading-none"
-            style={{
-              background: 'linear-gradient(135deg, #818cf8, #a78bfa)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              letterSpacing: '-0.5px',
-            }}
-          >
+        <div className={`flex flex-col ${collapsed ? 'items-center py-3' : 'px-4 py-4'} border-b border-[var(--card-border)] shrink-0`}>
+          <span className={`text-[20px] font-bold leading-none logo-gradient`} style={{ letterSpacing: '-0.5px' }}>
             {collapsed ? 'S' : 'Sqwady'}
           </span>
           {!collapsed && (
@@ -80,10 +73,10 @@ export default function Workspace({ project, team }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} h-10 rounded-lg border-none cursor-pointer text-sm font-medium transition-colors duration-150 shrink-0 ${
+                className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} h-10 rounded-xl border-none cursor-pointer text-sm font-medium transition-all duration-200 shrink-0 ${
                   isActive
                     ? 'bg-[var(--bg3)] text-[var(--t)] font-semibold border-l-[3px] border-l-[var(--ac)]'
-                    : 'bg-transparent text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t)] border-l-[3px] border-l-transparent'
+                    : 'bg-transparent text-[var(--t2)] hover:bg-[var(--bg3)] hover:text-[var(--t)] border-l-[3px] border-l-transparent hover:-translate-y-px'
                 }`}
                 style={{ fontFamily: 'inherit' }}
                 title={collapsed ? tab.label : undefined}
@@ -103,7 +96,7 @@ export default function Workspace({ project, team }) {
         </nav>
 
         {/* Team section */}
-        <div className="border-t border-[var(--bd)] shrink-0">
+        <div className="border-t border-[var(--card-border)] shrink-0">
           {!collapsed && (
             <div className="px-4 py-3">
               <div className="text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Команда</div>

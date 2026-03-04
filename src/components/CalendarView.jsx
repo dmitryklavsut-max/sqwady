@@ -75,7 +75,7 @@ export default function CalendarView({ team, tasks = [] }) {
                 d
                   ? isToday
                     ? 'border-2 border-[var(--ac)]'
-                    : 'border border-[var(--bd)] hover:border-[var(--bd2)]'
+                    : 'border border-[var(--card-border)] hover:border-[var(--bd2)]'
                   : 'border border-transparent'
               }`}
               style={{

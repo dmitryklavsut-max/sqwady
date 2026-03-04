@@ -53,7 +53,7 @@ export default function ChatPanel({ project, team, tasks, onAddTask }) {
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Channel sidebar ────────────────────────────── */}
-      <aside className="w-[200px] shrink-0 flex flex-col overflow-auto border-r border-[var(--bd)] bg-[var(--bg2)]" aria-label="Каналы">
+      <aside className="w-[200px] shrink-0 flex flex-col overflow-auto border-r border-[var(--card-border)] bg-[var(--bg2)]" aria-label="Каналы">
         <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider">
           Каналы
         </div>

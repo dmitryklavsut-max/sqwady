@@ -76,7 +76,7 @@ export default function KanbanBoard({ team, tasks, onSetTasks }) {
                 setDragging(null)
                 mv(e.dataTransfer.getData('tid'), c)
               }}
-              className="flex-1 min-w-[260px] flex flex-col rounded-[10px] p-3 transition-colors duration-150 bg-[var(--bg3)]"
+              className="flex-1 min-w-[260px] flex flex-col rounded-2xl p-3 transition-colors duration-150 bg-[var(--bg3)]"
               style={{ borderColor: isOver ? 'var(--ac)' : 'transparent', border: isOver ? '2px solid var(--ac)' : '2px solid transparent' }}
             >
               {/* Column header */}
@@ -97,8 +97,8 @@ export default function KanbanBoard({ team, tasks, onSetTasks }) {
                     onDragStart={(e) => { e.dataTransfer.setData('tid', t.id); setDragging(t.id) }}
                     onDragEnd={() => setDragging(null)}
                     onClick={() => { setIsNew(false); setMod(t) }}
-                    className={`rounded-[10px] cursor-grab border border-[var(--bd)] bg-[var(--bg2)] transition-all duration-150 active:cursor-grabbing ${
-                      dragging === t.id ? 'scale-[1.02] rotate-[1deg] opacity-70' : 'hover:-translate-y-0.5'
+                    className={`rounded-2xl cursor-grab border border-[var(--card-border)] bg-[var(--bg2)] transition-all duration-200 active:cursor-grabbing ${
+                      dragging === t.id ? 'scale-[1.02] rotate-[1deg] opacity-70' : 'hover:-translate-y-0.5 hover:border-[rgba(99,102,241,0.2)]'
                     }`}
                     style={{
                       borderLeft: `3px solid ${PRIORITY_COLORS[t.pr]}`,
@@ -148,11 +148,11 @@ export default function KanbanBoard({ team, tasks, onSetTasks }) {
       {mod && (
         <div
           className="fixed inset-0 flex items-center justify-center z-[999] animate-fade-in"
-          style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
           onClick={() => { setMod(null); setIsNew(false) }}
         >
           <div
-            className="animate-pop rounded-[14px] p-6 w-[480px] border border-[var(--bd)] bg-[var(--bg2)]"
+            className="animate-pop rounded-2xl p-6 w-[480px] border border-[var(--card-border)] bg-[var(--bg2)]"
             style={{ boxShadow: 'var(--shadow-lg)' }}
             onClick={(e) => e.stopPropagation()}
           >

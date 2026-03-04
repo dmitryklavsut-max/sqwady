@@ -75,7 +75,7 @@ function GridSlot({ index, entry, onRemove, onOpenConfig }) {
   return (
     <div
       ref={setNodeRef}
-      className={`relative flex flex-col items-center justify-center rounded-xl p-3 min-h-[120px] transition-all duration-200 ${
+      className={`relative flex flex-col items-center justify-center rounded-2xl p-3 min-h-[120px] transition-all duration-200 ${
         !entry ? 'hover:border-[var(--bd2)]' : ''
       }`}
       style={{
@@ -144,9 +144,10 @@ function ConfigModal({ entry, onSave, onClose }) {
       onClick={onClose}
     >
       <div
-        className="animate-pop rounded-xl p-6 w-[420px]"
+        className="animate-pop rounded-2xl p-6 w-[420px]"
         style={{
-          background: 'var(--bg2)',
+          background: 'var(--card-bg)',
+          backdropFilter: 'blur(10px)',
           border: `1px solid ${entry.color}33`,
           boxShadow: 'var(--shadow-lg)',
         }}
@@ -320,8 +321,8 @@ export default function OfficeBuild({ project, onDone }) {
 
           {/* Grid */}
           <div
-            className="flex-1 rounded-xl border border-[var(--bd)] p-5 relative overflow-auto bg-[var(--bg2)]"
-            style={{ boxShadow: 'var(--shadow-card)' }}
+            className="flex-1 rounded-2xl border border-[var(--card-border)] p-5 relative overflow-auto"
+            style={{ background: 'var(--card-bg)', backdropFilter: 'blur(10px)', boxShadow: 'var(--card-shadow)' }}
           >
             {/* Dot pattern */}
             <div

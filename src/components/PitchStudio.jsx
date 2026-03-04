@@ -33,7 +33,7 @@ export default function PitchStudio() {
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Slide list ─────────────────────────────────── */}
-      <aside className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Слайды">
+      <aside className="w-[220px] shrink-0 border-r border-[var(--card-border)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Слайды">
         <div className="text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-3">
           Слайды
         </div>
@@ -93,8 +93,8 @@ export default function PitchStudio() {
 
         {/* Slide frame */}
         <div
-          className="w-full max-w-[720px] rounded-xl border-2 border-[var(--bd)] flex flex-col items-center justify-center p-12 relative bg-[var(--bg2)]"
-          style={{ aspectRatio: '16/9', boxShadow: 'var(--shadow-lg)' }}
+          className="w-full max-w-[720px] rounded-2xl border border-[var(--card-border)] flex flex-col items-center justify-center p-12 relative bg-[var(--bg2)]"
+          style={{ aspectRatio: '16/9', boxShadow: 'var(--shadow-lg)', backdropFilter: 'blur(10px)' }}
         >
           {/* Toggle edit */}
           <button

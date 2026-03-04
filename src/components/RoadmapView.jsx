@@ -36,7 +36,7 @@ export default function RoadmapView() {
             style={{ height: 64, animationDelay: `${idx * 80}ms` }}
           >
             <div
-              className="absolute flex items-center px-5 rounded-xl cursor-pointer transition-all duration-200"
+              className="absolute flex items-center px-5 rounded-2xl cursor-pointer transition-all duration-200"
               style={{
                 left: `${(r.start / 12) * 100}%`,
                 width: `${(r.duration / 12) * 100}%`,

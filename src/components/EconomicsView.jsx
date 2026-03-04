@@ -61,7 +61,7 @@ export default function EconomicsView() {
           return (
             <div
               key={i}
-              className="flex items-center gap-4 p-5 rounded-xl border border-[var(--bd)] bg-[var(--bg2)] hover:border-[var(--bd2)] transition-all duration-200 animate-fade-up"
+              className="flex items-center gap-4 p-5 rounded-2xl border border-[var(--card-border)] bg-[var(--bg2)] hover:border-[rgba(99,102,241,0.2)] transition-all duration-200 animate-fade-up hover:-translate-y-px"
               style={{ minHeight: 100, boxShadow: 'var(--card-shadow)', animationDelay: `${i * 60}ms` }}
             >
               <div
@@ -81,7 +81,7 @@ export default function EconomicsView() {
 
       {/* Revenue vs Costs chart */}
       <div
-        className="bg-[var(--bg2)] rounded-xl border border-[var(--bd)] p-5 mb-4"
+        className="bg-[var(--bg2)] rounded-2xl border border-[var(--card-border)] p-5 mb-4"
         style={{ boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-base font-semibold mb-4">Revenue vs Costs ($K)</h2>
@@ -119,7 +119,7 @@ export default function EconomicsView() {
 
       {/* User growth chart */}
       <div
-        className="bg-[var(--bg2)] rounded-xl border border-[var(--bd)] p-5"
+        className="bg-[var(--bg2)] rounded-2xl border border-[var(--card-border)] p-5"
         style={{ boxShadow: 'var(--card-shadow)' }}
       >
         <h2 className="text-base font-semibold mb-4">User Growth</h2>

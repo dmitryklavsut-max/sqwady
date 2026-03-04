@@ -20,7 +20,7 @@ export default function WikiView() {
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Page list ──────────────────────────────────── */}
-      <aside className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Wiki страницы">
+      <aside className="w-[220px] shrink-0 border-r border-[var(--card-border)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Wiki страницы">
         <div className="flex items-center gap-2 text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-3">
           <BookOpen size={14} />
           Wiki
@@ -92,7 +92,7 @@ export default function WikiView() {
             />
           ) : (
             <div
-              className="text-[15px] text-[var(--t2)] whitespace-pre-wrap p-6 rounded-xl border border-[var(--bd)] bg-[var(--bg2)]"
+              className="text-[15px] text-[var(--t2)] whitespace-pre-wrap p-6 rounded-2xl border border-[var(--card-border)] bg-[var(--bg2)]"
               style={{ lineHeight: 1.8, boxShadow: 'var(--card-shadow)' }}
             >
               {pages[ac]?.text}
