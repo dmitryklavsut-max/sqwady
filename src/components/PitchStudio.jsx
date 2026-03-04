@@ -33,7 +33,7 @@ export default function PitchStudio() {
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Slide list ─────────────────────────────────── */}
-      <div className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col">
+      <aside className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Слайды">
         <div className="text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-3">
           Слайды
         </div>
@@ -42,13 +42,14 @@ export default function PitchStudio() {
             <div
               key={i}
               onClick={() => { setAc(i); setEditing(false) }}
-              className={`flex items-center gap-3 px-3 h-10 rounded-lg cursor-pointer text-sm transition-colors duration-150 shrink-0 ${
+              className={`flex items-center gap-3 px-3 rounded-lg cursor-pointer text-sm transition-colors duration-150 shrink-0 ${
                 ac === i
                   ? 'bg-[var(--bg3)] text-[var(--t)] font-semibold border-l-[3px] border-l-[var(--ac)]'
                   : 'text-[var(--t2)] border-l-[3px] border-l-transparent hover:bg-[var(--bg3)] hover:text-[var(--t)]'
               }`}
+              style={{ height: 44 }}
             >
-              <span className="text-xs text-[var(--t3)] font-mono w-4 shrink-0">{i + 1}</span>
+              <span className="text-base text-[var(--t3)] font-mono w-5 shrink-0 text-right">{i + 1}</span>
               <RoleIcon name={s.iconName} size={16} color={ac === i ? 'var(--ac)' : undefined} />
               <span className="truncate">{s.title}</span>
             </div>
@@ -65,29 +66,34 @@ export default function PitchStudio() {
         >
           <Plus size={14} /> Добавить слайд
         </Button>
-      </div>
+      </aside>
 
       {/* ── Slide preview ──────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
+      <div
+        className="flex-1 flex flex-col items-center justify-center p-8 relative"
+        style={{ background: 'linear-gradient(135deg, var(--bg), var(--bg3))' }}
+      >
         {/* Nav arrows */}
         <button
           onClick={prev}
           disabled={ac === 0}
-          className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-lg border-none cursor-pointer bg-[var(--bg3)] text-[var(--t2)] hover:bg-[var(--bg4)] hover:text-[var(--t)] transition-colors disabled:opacity-20 disabled:cursor-default"
+          className="absolute left-6 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full border-none cursor-pointer bg-[var(--bg3)] text-[var(--t2)] hover:bg-[var(--bg4)] hover:text-[var(--t)] transition-colors disabled:opacity-20 disabled:cursor-default"
+          aria-label="Предыдущий слайд"
         >
           <ChevronLeft size={22} />
         </button>
         <button
           onClick={next}
           disabled={ac === slides.length - 1}
-          className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg border-none cursor-pointer bg-[var(--bg3)] text-[var(--t2)] hover:bg-[var(--bg4)] hover:text-[var(--t)] transition-colors disabled:opacity-20 disabled:cursor-default"
+          className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full border-none cursor-pointer bg-[var(--bg3)] text-[var(--t2)] hover:bg-[var(--bg4)] hover:text-[var(--t)] transition-colors disabled:opacity-20 disabled:cursor-default"
+          aria-label="Следующий слайд"
         >
           <ChevronRight size={22} />
         </button>
 
         {/* Slide frame */}
         <div
-          className="w-full max-w-[640px] rounded-xl border-2 border-[var(--bd)] flex flex-col items-center justify-center p-12 relative bg-[var(--bg2)]"
+          className="w-full max-w-[720px] rounded-xl border-2 border-[var(--bd)] flex flex-col items-center justify-center p-12 relative bg-[var(--bg2)]"
           style={{ aspectRatio: '16/9', boxShadow: 'var(--shadow-lg)' }}
         >
           {/* Toggle edit */}
@@ -124,7 +130,7 @@ export default function PitchStudio() {
                 <RoleIcon name={slides[ac]?.iconName} size={48} color="var(--ac)" />
               </div>
               <div className="text-[32px] font-extrabold mb-3">{slides[ac]?.title}</div>
-              <div className="text-base text-[var(--t2)] leading-relaxed text-center whitespace-pre-wrap max-w-[480px]">
+              <div className="text-base text-[var(--t2)] leading-relaxed text-center whitespace-pre-wrap max-w-[520px]">
                 {slides[ac]?.text}
               </div>
             </div>
@@ -137,6 +143,7 @@ export default function PitchStudio() {
                 key={i}
                 onClick={() => setAc(i)}
                 className="rounded-full cursor-pointer transition-all duration-200 border-none p-0"
+                aria-label={`Слайд ${i + 1}`}
                 style={{
                   width: i === ac ? 20 : 8,
                   height: 8,

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Save, PenLine, BookOpen } from 'lucide-react'
+import { Plus, Save, PenLine, BookOpen, Edit2 } from 'lucide-react'
 import { WIKI_PAGES } from '../data/constants'
 import RoleIcon from './RoleIcon'
 import Button from './Button'
@@ -20,7 +20,7 @@ export default function WikiView() {
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Page list ──────────────────────────────────── */}
-      <div className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col">
+      <aside className="w-[220px] shrink-0 border-r border-[var(--bd)] bg-[var(--bg2)] p-4 overflow-auto flex flex-col" aria-label="Wiki страницы">
         <div className="flex items-center gap-2 text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-3">
           <BookOpen size={14} />
           Wiki
@@ -30,11 +30,12 @@ export default function WikiView() {
             <div
               key={i}
               onClick={() => { setAc(i); setEditing(false) }}
-              className={`flex items-center gap-3 px-3 h-9 rounded-lg cursor-pointer text-sm transition-colors duration-150 shrink-0 ${
+              className={`flex items-center gap-3 px-3 rounded-lg cursor-pointer text-sm transition-colors duration-150 shrink-0 ${
                 ac === i
                   ? 'bg-[var(--bg3)] text-[var(--t)] font-semibold border-l-[3px] border-l-[var(--ac)]'
                   : 'text-[var(--t2)] border-l-[3px] border-l-transparent hover:bg-[var(--bg3)] hover:text-[var(--t)]'
               }`}
+              style={{ height: 40 }}
             >
               <RoleIcon name={p.iconName} size={16} color={ac === i ? 'var(--ac)' : undefined} />
               <span className="truncate">{p.title}</span>
@@ -53,7 +54,7 @@ export default function WikiView() {
         >
           <Plus size={14} /> Страница
         </Button>
-      </div>
+      </aside>
 
       {/* ── Content area ───────────────────────────────── */}
       <div className="flex-1 overflow-auto">
@@ -75,8 +76,9 @@ export default function WikiView() {
             <button
               onClick={() => setEditing(!editing)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs text-[var(--t2)] cursor-pointer border-none ml-4 bg-[var(--bg3)] hover:bg-[var(--bg4)] hover:text-[var(--t)] transition-colors duration-150 font-medium shrink-0"
+              aria-label={editing ? 'Сохранить' : 'Редактировать'}
             >
-              {editing ? <><Save size={14} /> Сохранить</> : <><PenLine size={14} /> Редактировать</>}
+              {editing ? <><Save size={14} /> Сохранить</> : <><Edit2 size={14} /> Редактировать</>}
             </button>
           </div>
 
@@ -90,8 +92,8 @@ export default function WikiView() {
             />
           ) : (
             <div
-              className="text-[15px] text-[var(--t2)] whitespace-pre-wrap p-6 rounded-xl border border-[var(--bd)] bg-[var(--bg2)] font-mono"
-              style={{ lineHeight: 1.8, boxShadow: 'var(--shadow-card)' }}
+              className="text-[15px] text-[var(--t2)] whitespace-pre-wrap p-6 rounded-xl border border-[var(--bd)] bg-[var(--bg2)]"
+              style={{ lineHeight: 1.8, boxShadow: 'var(--card-shadow)' }}
             >
               {pages[ac]?.text}
             </div>

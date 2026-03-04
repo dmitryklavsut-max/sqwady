@@ -4,37 +4,39 @@
 /* ── Dark theme (default) ────────────────────────────── */
 :root {
   --bg: #09090b;
-  --bg2: #18181b;
-  --bg3: #27272a;
-  --bg4: #3f3f46;
-  --bd: #27272a;
-  --bd2: #3f3f46;
-  --t: #fafafa;
-  --t2: #a1a1aa;
-  --t3: #71717a;
+  --bg2: #141419;
+  --bg3: #1c1c24;
+  --bg4: #2a2a36;
+  --bd: #2a2a36;
+  --bd2: #3a3a48;
+  --t: #f0f0f5;
+  --t2: #9b9bb0;
+  --t3: #6b6b80;
   --ac: #818cf8;
   --ac2: #6366f1;
   --gn: #34d399;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  --nav-bg: rgba(9,9,11,0.85);
 }
 
 /* ── Light theme ─────────────────────────────────────── */
 [data-theme="light"] {
-  --bg: #f8fafc;
+  --bg: #f8f9fb;
   --bg2: #ffffff;
-  --bg3: #f1f5f9;
-  --bg4: #e2e8f0;
-  --bd: #e2e8f0;
-  --bd2: #cbd5e1;
-  --t: #0f172a;
-  --t2: #64748b;
-  --t3: #94a3b8;
+  --bg3: #f1f3f5;
+  --bg4: #e9ecef;
+  --bd: #dee2e6;
+  --bd2: #ced4da;
+  --t: #1a1a2e;
+  --t2: #495057;
+  --t3: #868e96;
   --ac: #6366f1;
   --ac2: #4f46e5;
-  --gn: #10b981;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --gn: #059669;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --nav-bg: rgba(255,255,255,0.85);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -47,6 +49,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
   line-height: 1.5;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -55,27 +58,46 @@ body {
 
 input, textarea, select { font-family: inherit; }
 
+/* ── Focus ring (WCAG) ───────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+/* ── Animations ──────────────────────────────────────── */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }
-
 @keyframes popIn {
-  0% { transform: scale(0.92); opacity: 0; }
+  0% { transform: scale(0.95); opacity: 0; }
   100% { transform: scale(1); opacity: 1; }
 }
-
 @keyframes slideIn {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: none; }
 }
-
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-.animate-fade-up { animation: fadeUp 0.35s ease both; }
+.animate-fade-up { animation: fadeUp 0.3s ease both; }
 .animate-pop { animation: popIn 0.2s ease both; }
 .animate-slide-in { animation: slideIn 0.2s ease both; }
-.animate-fade-in { animation: fadeIn 0.2s ease both; }
+.animate-fade-in { animation: fadeIn 0.15s ease both; }
+
+/* ── Reduced motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

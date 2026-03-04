@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, Clipboard } from 'lucide-react'
+import { Send, Clipboard, Hash } from 'lucide-react'
 import { CHANNELS, timestamp } from '../data/constants'
 import RoleIcon from './RoleIcon'
 import Avatar from './Avatar'
@@ -20,7 +20,6 @@ export default function ChatPanel({ project, team, tasks, onAddTask }) {
   })
   const [inp, setInp] = useState('')
   const endRef = useRef(null)
-
   const tm = {}
   team.forEach((m) => { tm[m.id + m.slot] = m })
 
@@ -49,58 +48,72 @@ export default function ChatPanel({ project, team, tasks, onAddTask }) {
   }
 
   const cm = msgs[ch] || []
+  const showTaskHint = inp.startsWith('/task')
 
   return (
     <div className="flex h-full overflow-hidden w-full">
       {/* ── Channel sidebar ────────────────────────────── */}
-      <div className="w-[220px] shrink-0 flex flex-col overflow-auto border-r border-[var(--bd)] bg-[var(--bg2)]">
-        <div className="px-4 pt-4 pb-2 text-xs font-bold text-[var(--t3)] uppercase tracking-wider">
+      <aside className="w-[200px] shrink-0 flex flex-col overflow-auto border-r border-[var(--bd)] bg-[var(--bg2)]" aria-label="Каналы">
+        <div className="px-4 pt-4 pb-2 text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider">
           Каналы
         </div>
-        {Object.entries(CHANNELS).map(([k, c]) => (
-          <div
-            key={k}
-            onClick={() => setCh(k)}
-            className={`flex items-center gap-3 px-4 h-9 cursor-pointer text-sm transition-colors duration-150 shrink-0 ${
-              ch === k
-                ? 'bg-[var(--bg3)] text-[var(--t)] font-semibold border-l-[3px] border-l-[var(--ac)]'
-                : 'text-[var(--t2)] border-l-[3px] border-l-transparent hover:bg-[var(--bg3)] hover:text-[var(--t)]'
-            }`}
-          >
-            <RoleIcon name={c.iconName} size={18} color={ch === k ? 'var(--ac)' : undefined} />
-            <span>{c.name}</span>
-          </div>
-        ))}
+        {Object.entries(CHANNELS).map(([k, c]) => {
+          const isActive = ch === k
+          const unread = !isActive && k === 'eng'
+          return (
+            <button
+              key={k}
+              onClick={() => setCh(k)}
+              className={`flex items-center gap-2.5 mx-2 px-3 h-9 rounded-lg border-none cursor-pointer text-sm font-medium transition-colors duration-150 shrink-0 text-left ${
+                isActive
+                  ? 'bg-[var(--bg3)] text-[var(--t)] font-semibold border-l-[3px] border-l-[var(--ac)]'
+                  : 'bg-transparent text-[var(--t2)] border-l-[3px] border-l-transparent hover:bg-[var(--bg3)] hover:text-[var(--t)]'
+              }`}
+              style={{ fontFamily: 'inherit' }}
+            >
+              <Hash size={14} className="shrink-0 text-[var(--t3)]" />
+              <span className="truncate">{c.name}</span>
+              {unread && <div className="w-2 h-2 rounded-full bg-red-500 ml-auto shrink-0" />}
+            </button>
+          )
+        })}
 
         <div className="mt-auto border-t border-[var(--bd)] px-4 py-3">
-          <div className="text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Команда</div>
+          <div className="text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Команда</div>
           {team.map((m) => (
             <div
               key={m.id + m.slot}
-              className="flex items-center gap-2.5 py-1.5 px-2 rounded-lg hover:bg-[var(--bg3)] transition-colors"
+              className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors"
             >
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Avatar person={m.per} size={24} />
-                <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-[var(--gn)] border-2 border-[var(--bg2)]" />
+                <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
               </div>
-              <span className="text-xs font-medium text-[var(--t)] truncate">
+              <span className="text-[13px] font-medium text-[var(--t)] truncate">
                 {m.pn || m.label}
               </span>
             </div>
           ))}
         </div>
-      </div>
+      </aside>
 
       {/* ── Messages ───────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <section className="flex-1 flex flex-col min-w-0">
         {/* Channel header */}
-        <div className="flex items-center gap-2.5 px-6 py-3 border-b border-[var(--bd)] bg-[var(--bg2)] shrink-0">
-          <RoleIcon name={CHANNELS[ch]?.iconName} size={18} color="var(--ac)" />
-          <span className="text-base font-semibold">{CHANNELS[ch]?.name}</span>
-        </div>
+        <header className="flex items-center gap-2.5 px-6 py-3 border-b border-[var(--bd)] bg-[var(--bg2)] shrink-0">
+          <Hash size={16} className="text-[var(--t3)]" />
+          <span className="text-lg font-semibold">{CHANNELS[ch]?.name}</span>
+        </header>
 
         {/* Message feed */}
         <div className="flex-1 overflow-y-auto py-3">
+          {cm.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full text-[var(--t3)]">
+              <RoleIcon name={CHANNELS[ch]?.iconName} size={40} className="mb-3 opacity-30" />
+              <p className="text-sm font-medium">Нет сообщений</p>
+              <p className="text-xs mt-1">Начните общение в #{CHANNELS[ch]?.name}</p>
+            </div>
+          )}
           {cm.map((m) => {
             const d = m.f === 'you'
               ? { pn: 'You', color: 'var(--ac)', per: null }
@@ -108,27 +121,27 @@ export default function ChatPanel({ project, team, tasks, onAddTask }) {
             return (
               <div
                 key={m.id}
-                className="flex gap-3 px-6 py-2 hover:bg-[var(--bg2)] transition-colors group"
+                className="flex gap-3 px-6 py-2 hover:bg-[var(--bg3)] transition-colors duration-100 group"
               >
-                <div className="shrink-0 mt-0.5">
-                  <Avatar person={m.f === 'you' ? null : d.per} size={32} />
+                <div className="shrink-0 mt-1">
+                  <Avatar person={m.f === 'you' ? null : d.per} size={36} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-[13px]" style={{ color: d.color }}>
+                    <span className="font-bold text-sm" style={{ color: d.color }}>
                       {d.pn || d.label}
                     </span>
-                    <span className="text-xs text-[var(--t3)] opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                    <span className="text-xs text-[var(--t3)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {m.t}
                     </span>
                   </div>
-                  <div className="text-sm text-[var(--t2)] leading-relaxed mt-0.5 whitespace-pre-wrap">
+                  <div className="text-sm text-[var(--t2)] mt-0.5 whitespace-pre-wrap" style={{ lineHeight: 1.6 }}>
                     {m.tx}
                   </div>
                   {m.task && (
                     <div
                       className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--ac)]"
-                      style={{ background: 'rgba(129,140,248,0.08)' }}
+                      style={{ background: 'rgba(99,102,241,0.1)' }}
                     >
                       <Clipboard size={13} />
                       {m.task}
@@ -141,23 +154,28 @@ export default function ChatPanel({ project, team, tasks, onAddTask }) {
           <div ref={endRef} />
         </div>
 
-        {/* Input */}
+        {/* Input area */}
         <div className="px-6 py-4 border-t border-[var(--bd)] bg-[var(--bg2)]">
-          <div className="text-xs text-[var(--t3)] mb-2 font-mono">/task Название — создать задачу</div>
+          {showTaskHint && (
+            <div className="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[var(--bg3)] text-xs text-[var(--ac)] font-medium">
+              <Clipboard size={12} />
+              Создание задачи
+            </div>
+          )}
           <div className="flex gap-3">
             <input
               value={inp}
               onChange={(e) => setInp(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
-              placeholder="Написать сообщение..."
+              placeholder="Сообщение... (/task для задачи)"
               className="flex-1 px-4 h-11 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors"
             />
-            <Button onClick={send} small>
+            <Button onClick={send} small aria-label="Отправить">
               <Send size={16} />
             </Button>
           </div>
         </div>
-      </div>
+      </section>
     </div>
   )
 }
