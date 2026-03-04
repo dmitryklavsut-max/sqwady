@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Dark theme (default) ────────────────────────────── */
+:root {
+  --bg: #09090b;
+  --bg2: #18181b;
+  --bg3: #27272a;
+  --bg4: #3f3f46;
+  --bd: #27272a;
+  --bd2: #3f3f46;
+  --t: #fafafa;
+  --t2: #a1a1aa;
+  --t3: #71717a;
+  --ac: #818cf8;
+  --ac2: #6366f1;
+  --gn: #34d399;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* ── Light theme ─────────────────────────────────────── */
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --bg2: #ffffff;
+  --bg3: #f1f5f9;
+  --bg4: #e2e8f0;
+  --bd: #e2e8f0;
+  --bd2: #cbd5e1;
+  --t: #0f172a;
+  --t2: #64748b;
+  --t3: #94a3b8;
+  --ac: #6366f1;
+  --ac2: #4f46e5;
+  --gn: #10b981;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--t);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+input, textarea, select { font-family: inherit; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-up { animation: fadeUp 0.35s ease both; }
+.animate-pop { animation: popIn 0.2s ease both; }
+.animate-slide-in { animation: slideIn 0.2s ease both; }
+.animate-fade-in { animation: fadeIn 0.2s ease both; }
