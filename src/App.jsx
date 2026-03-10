@@ -8,7 +8,13 @@ import Workspace from './pages/Workspace'
 
 function AppRoutes() {
   const { state, dispatch } = useApp()
-  const [page, setPage] = useState('landing')
+  const [page, setPage] = useState(() => {
+    // Restore page from persisted state
+    if (state.project && state.team.length > 0 && (state.tasks?.length > 0 || state.pitchSlides?.length > 0)) return 'workspace'
+    if (state.project && state.team.length > 0) return 'generation'
+    if (state.project) return 'office'
+    return 'landing'
+  })
 
   return (
     <>
