@@ -1,0 +1,892 @@
+import { DESKS } from '../data/constants.js'
+
+// ─── Anthropic API config ───────────────────────────────────────────
+const API_URL = '/api/recommend'
+const MODEL = 'claude-sonnet-4-20250514'
+
+// ─── generateRecommendations ────────────────────────────────────────
+// Takes project from Setup screen 1 (name, description, industry, stage, audience)
+// Returns { businessModel, competitors, techStack, teamComposition, agentDefaults }
+export async function generateRecommendations(project) {
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, model: MODEL }),
+    })
+
+    if (!res.ok) throw new Error(`API ${res.status}`)
+
+    const data = await res.json()
+    return data
+  } catch (err) {
+    console.warn('AI recommendations unavailable, using fallback:', err.message)
+    return generateFallbackRecommendations(project)
+  }
+}
+
+// ─── Fallback: template-based recommendations ───────────────────────
+function generateFallbackRecommendations(project) {
+  const industry = project.industry || ''
+  const defaults = INDUSTRY_DEFAULTS[industry] || INDUSTRY_DEFAULTS['SaaS']
+
+  return {
+    businessModel: defaults.businessModel,
+    competitors: defaults.competitors,
+    techStack: defaults.techStack,
+    teamComposition: defaults.teamComposition.map((rec) => ({
+      role: rec.role,
+      reason: rec.reason,
+    })),
+    agentDefaults: buildAgentDefaults(defaults.teamComposition, project),
+  }
+}
+
+// Build position + personality suggestions for each recommended role
+function buildAgentDefaults(teamComp, project) {
+  const defaults = {}
+  for (const rec of teamComp) {
+    const desk = DESKS.find((d) => d.id === rec.role)
+    if (!desk) continue
+    defaults[rec.role] = {
+      position: {
+        functions: rec.position.functions,
+        responsibilities: rec.position.responsibilities,
+        interactions: rec.position.interactions,
+        metrics: rec.position.metrics,
+      },
+      personality: rec.personality,
+    }
+  }
+  return defaults
+}
+
+// ─── Industry defaults (9 industries) ───────────────────────────────
+const INDUSTRY_DEFAULTS = {
+  'AI/ML': {
+    businessModel: {
+      model: 'Usage-based',
+      reason: 'AI products scale with usage; pay-per-call aligns cost with value delivered.',
+    },
+    competitors: [
+      'OpenAI', 'Anthropic', 'Hugging Face', 'Cohere', 'Replicate',
+    ],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Python (FastAPI)',
+      ml: 'PyTorch + HuggingFace',
+      infra: 'AWS / GCP, Docker, K8s',
+      db: 'PostgreSQL + Redis + Pinecone',
+    },
+    teamComposition: [
+      {
+        role: 'cto',
+        reason: 'Technical vision and ML architecture decisions',
+        position: {
+          functions: ['Architecture design', 'ML pipeline', 'Tech strategy'],
+          responsibilities: ['System design', 'Model selection', 'Team mentoring'],
+          interactions: ['Receives tasks from CEO', 'Delegates to Backend and ML Eng'],
+          metrics: ['System uptime 99.9%', 'Model latency <100ms'],
+        },
+        personality: {
+          name: 'Алексей', gender: 'male', age: 34,
+          experience: 'Senior', skills: ['System Design', 'Python', 'ML Ops'],
+          temperament: 'analytical', communicationStyle: 'concise',
+          background: '10 лет в ML, ex-Яндекс', approach: 'data-driven',
+        },
+      },
+      {
+        role: 'back',
+        reason: 'API layer and data pipeline are core to AI product',
+        position: {
+          functions: ['API development', 'Data pipelines', 'Integrations'],
+          responsibilities: ['REST/gRPC APIs', 'Database design', 'Performance'],
+          interactions: ['Receives tasks from CTO', 'Coordinates with ML Eng'],
+          metrics: ['API response <200ms', 'Test coverage >80%'],
+        },
+        personality: {
+          name: 'Дмитрий', gender: 'male', age: 29,
+          experience: 'Middle+', skills: ['Python', 'FastAPI', 'PostgreSQL'],
+          temperament: 'systematic', communicationStyle: 'technical',
+          background: '6 лет backend, ex-Сбер', approach: 'pragmatic',
+        },
+      },
+      {
+        role: 'ml',
+        reason: 'Core ML engineering for model training and inference',
+        position: {
+          functions: ['Model training', 'Feature engineering', 'Evaluation'],
+          responsibilities: ['ML pipelines', 'Model optimization', 'A/B testing'],
+          interactions: ['Receives tasks from CTO', 'Sends results to Backend'],
+          metrics: ['Model accuracy >90%', 'Training time optimization'],
+        },
+        personality: {
+          name: 'Ирина', gender: 'female', age: 31,
+          experience: 'Senior', skills: ['PyTorch', 'NLP', 'MLOps'],
+          temperament: 'curious', communicationStyle: 'detailed',
+          background: '8 лет ML research, PhD', approach: 'experimental',
+        },
+      },
+      {
+        role: 'ops',
+        reason: 'ML infrastructure needs robust DevOps',
+        position: {
+          functions: ['CI/CD', 'Infrastructure', 'Monitoring'],
+          responsibilities: ['K8s clusters', 'GPU provisioning', 'Cost optimization'],
+          interactions: ['Receives tasks from CTO', 'Supports all engineers'],
+          metrics: ['Deploy frequency daily', 'MTTR <1h'],
+        },
+        personality: {
+          name: 'Сергей', gender: 'male', age: 32,
+          experience: 'Senior', skills: ['Kubernetes', 'Terraform', 'AWS'],
+          temperament: 'calm', communicationStyle: 'structured',
+          background: '7 лет DevOps, ex-VK', approach: 'automation-first',
+        },
+      },
+      {
+        role: 'pm',
+        reason: 'Complex ML projects need strong product management',
+        position: {
+          functions: ['Roadmap planning', 'Prioritization', 'Stakeholder sync'],
+          responsibilities: ['Sprint planning', 'Feature specs', 'Metrics tracking'],
+          interactions: ['Receives tasks from CEO', 'Assigns to all teams'],
+          metrics: ['Sprint velocity', 'Feature adoption rate'],
+        },
+        personality: {
+          name: 'Елена', gender: 'female', age: 30,
+          experience: 'Middle+', skills: ['Agile', 'Analytics', 'Roadmapping'],
+          temperament: 'organized', communicationStyle: 'clear',
+          background: '5 лет PM в tech, ex-Тинькофф', approach: 'user-centric',
+        },
+      },
+    ],
+  },
+
+  'SaaS': {
+    businessModel: {
+      model: 'Subscription',
+      reason: 'Predictable recurring revenue, standard for B2B SaaS.',
+    },
+    competitors: ['Notion', 'Slack', 'Linear', 'Monday.com', 'Asana'],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Node.js (Express)',
+      infra: 'Vercel / AWS',
+      db: 'PostgreSQL + Redis',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Technical architecture for scalable SaaS',
+        position: {
+          functions: ['Architecture', 'Tech strategy', 'Code reviews'],
+          responsibilities: ['System design', 'Tech debt management', 'Hiring'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Uptime 99.9%', 'Page load <2s'],
+        },
+        personality: {
+          name: 'Алексей', gender: 'male', age: 33,
+          experience: 'Senior', skills: ['Node.js', 'React', 'System Design'],
+          temperament: 'strategic', communicationStyle: 'concise',
+          background: '9 лет fullstack, ex-Avito', approach: 'iterative',
+        },
+      },
+      {
+        role: 'front', reason: 'User experience is critical for SaaS retention',
+        position: {
+          functions: ['UI development', 'Design system', 'Performance'],
+          responsibilities: ['Component library', 'Responsive design', 'A11y'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Core Web Vitals green', 'Component coverage >90%'],
+        },
+        personality: {
+          name: 'Ольга', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['React', 'TypeScript', 'CSS'],
+          temperament: 'creative', communicationStyle: 'visual',
+          background: '5 лет frontend, ex-Ozon', approach: 'design-driven',
+        },
+      },
+      {
+        role: 'back', reason: 'Robust API and data layer for SaaS',
+        position: {
+          functions: ['API development', 'Auth', 'Billing integration'],
+          responsibilities: ['REST APIs', 'Database schema', 'Security'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['API latency <150ms', 'Zero data breaches'],
+        },
+        personality: {
+          name: 'Дмитрий', gender: 'male', age: 30,
+          experience: 'Senior', skills: ['Node.js', 'PostgreSQL', 'Redis'],
+          temperament: 'reliable', communicationStyle: 'technical',
+          background: '7 лет backend, ex-Яндекс', approach: 'security-first',
+        },
+      },
+      {
+        role: 'des', reason: 'Great UX differentiates SaaS products',
+        position: {
+          functions: ['UI/UX design', 'Prototyping', 'User research'],
+          responsibilities: ['Design system', 'Wireframes', 'Usability testing'],
+          interactions: ['Receives from PM', 'Sends to Frontend'],
+          metrics: ['Task completion rate >85%', 'NPS >50'],
+        },
+        personality: {
+          name: 'Мария', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['Figma', 'Prototyping', 'Design Systems'],
+          temperament: 'empathetic', communicationStyle: 'visual',
+          background: '6 лет дизайн, ex-Сбер', approach: 'user-first',
+        },
+      },
+      {
+        role: 'pm', reason: 'Product-led growth needs strong PM',
+        position: {
+          functions: ['Roadmap', 'Prioritization', 'User analytics'],
+          responsibilities: ['Feature specs', 'Sprint planning', 'Metrics'],
+          interactions: ['Receives from CEO', 'Assigns to teams'],
+          metrics: ['MRR growth', 'Churn <5%'],
+        },
+        personality: {
+          name: 'Елена', gender: 'female', age: 31,
+          experience: 'Senior', skills: ['Analytics', 'Agile', 'SQL'],
+          temperament: 'organized', communicationStyle: 'clear',
+          background: '7 лет PM, ex-VK', approach: 'data-driven',
+        },
+      },
+    ],
+  },
+
+  'FinTech': {
+    businessModel: {
+      model: 'Transaction fee',
+      reason: 'Revenue scales with payment volume, standard for fintech.',
+    },
+    competitors: ['Stripe', 'Tinkoff', 'Revolut', 'Square', 'Wise'],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Go / Java (Spring)',
+      infra: 'AWS, Kubernetes',
+      db: 'PostgreSQL + ClickHouse',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Security-critical architecture',
+        position: {
+          functions: ['Architecture', 'Security', 'Compliance'],
+          responsibilities: ['System design', 'Audit', 'PCI DSS'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Zero breaches', 'Uptime 99.99%'],
+        },
+        personality: {
+          name: 'Андрей', gender: 'male', age: 37,
+          experience: 'Lead', skills: ['Security', 'Go', 'Distributed Systems'],
+          temperament: 'cautious', communicationStyle: 'precise',
+          background: '12 лет fintech, ex-Тинькофф', approach: 'security-first',
+        },
+      },
+      {
+        role: 'back', reason: 'Transaction processing is core',
+        position: {
+          functions: ['Payment APIs', 'Transaction processing', 'Reconciliation'],
+          responsibilities: ['API reliability', 'Data consistency', 'Fraud detection'],
+          interactions: ['Receives from CTO', 'Coordinates with Ops'],
+          metrics: ['Transaction success >99.5%', 'Latency <100ms'],
+        },
+        personality: {
+          name: 'Максим', gender: 'male', age: 32,
+          experience: 'Senior', skills: ['Go', 'PostgreSQL', 'gRPC'],
+          temperament: 'meticulous', communicationStyle: 'technical',
+          background: '8 лет backend, ex-Сбер', approach: 'reliability-first',
+        },
+      },
+      {
+        role: 'front', reason: 'Trust-building UI for financial product',
+        position: {
+          functions: ['Dashboard UI', 'Transaction views', 'Security UX'],
+          responsibilities: ['Responsive design', 'Accessibility', 'Performance'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Page load <1.5s', 'Error rate <0.1%'],
+        },
+        personality: {
+          name: 'Ксения', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['React', 'TypeScript', 'Testing'],
+          temperament: 'detail-oriented', communicationStyle: 'clear',
+          background: '5 лет frontend, ex-Revolut', approach: 'quality-focused',
+        },
+      },
+      {
+        role: 'ops', reason: 'High-availability infrastructure for payments',
+        position: {
+          functions: ['Infrastructure', 'Monitoring', 'Incident response'],
+          responsibilities: ['K8s', 'CI/CD', 'Disaster recovery'],
+          interactions: ['Receives from CTO', 'Supports all teams'],
+          metrics: ['MTTR <15min', 'Deploy success >99%'],
+        },
+        personality: {
+          name: 'Павел', gender: 'male', age: 33,
+          experience: 'Senior', skills: ['Kubernetes', 'Prometheus', 'AWS'],
+          temperament: 'calm', communicationStyle: 'structured',
+          background: '8 лет SRE, ex-Яндекс', approach: 'proactive',
+        },
+      },
+      {
+        role: 'qa', reason: 'Financial software demands rigorous testing',
+        position: {
+          functions: ['Test automation', 'Security testing', 'Load testing'],
+          responsibilities: ['Test coverage', 'Regression testing', 'Compliance checks'],
+          interactions: ['Receives from PM', 'Reports to CTO'],
+          metrics: ['Test coverage >95%', 'Bug escape rate <1%'],
+        },
+        personality: {
+          name: 'Наталья', gender: 'female', age: 29,
+          experience: 'Middle+', skills: ['Selenium', 'Postman', 'k6'],
+          temperament: 'thorough', communicationStyle: 'detailed',
+          background: '6 лет QA в финтехе', approach: 'risk-based',
+        },
+      },
+    ],
+  },
+
+  'E-commerce': {
+    businessModel: {
+      model: 'Marketplace commission',
+      reason: 'Commission on transactions is proven for e-commerce platforms.',
+    },
+    competitors: ['Shopify', 'WooCommerce', 'Ozon', 'Wildberries', 'Amazon'],
+    techStack: {
+      frontend: 'Next.js + TypeScript',
+      backend: 'Node.js (NestJS)',
+      infra: 'Vercel + AWS',
+      db: 'PostgreSQL + Elasticsearch + Redis',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Scalable commerce architecture',
+        position: {
+          functions: ['Architecture', 'Performance', 'Integrations'],
+          responsibilities: ['System design', 'Payment integrations', 'Scale planning'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Page load <2s', 'Cart conversion >3%'],
+        },
+        personality: {
+          name: 'Виктор', gender: 'male', age: 35,
+          experience: 'Senior', skills: ['Node.js', 'Microservices', 'AWS'],
+          temperament: 'pragmatic', communicationStyle: 'concise',
+          background: '10 лет e-commerce, ex-Ozon', approach: 'performance-driven',
+        },
+      },
+      {
+        role: 'front', reason: 'Conversion-optimized storefront',
+        position: {
+          functions: ['Storefront UI', 'Checkout flow', 'Mobile optimization'],
+          responsibilities: ['Performance', 'A/B testing', 'SEO'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Core Web Vitals green', 'Bounce rate <40%'],
+        },
+        personality: {
+          name: 'Анна', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['Next.js', 'React', 'SEO'],
+          temperament: 'creative', communicationStyle: 'visual',
+          background: '5 лет frontend, ex-Lamoda', approach: 'conversion-focused',
+        },
+      },
+      {
+        role: 'back', reason: 'Order processing, inventory, payments',
+        position: {
+          functions: ['Order API', 'Inventory management', 'Payment gateway'],
+          responsibilities: ['API development', 'Data consistency', 'Integrations'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['Order processing <500ms', 'Zero lost orders'],
+        },
+        personality: {
+          name: 'Роман', gender: 'male', age: 31,
+          experience: 'Senior', skills: ['Node.js', 'PostgreSQL', 'RabbitMQ'],
+          temperament: 'systematic', communicationStyle: 'technical',
+          background: '7 лет backend, ex-Wildberries', approach: 'reliability-first',
+        },
+      },
+      {
+        role: 'des', reason: 'UX directly impacts sales',
+        position: {
+          functions: ['Product pages', 'Checkout UX', 'Mobile design'],
+          responsibilities: ['Wireframes', 'User testing', 'Design system'],
+          interactions: ['Receives from PM', 'Sends to Frontend'],
+          metrics: ['Cart abandonment <60%', 'Task completion >90%'],
+        },
+        personality: {
+          name: 'Дарья', gender: 'female', age: 26,
+          experience: 'Middle', skills: ['Figma', 'UX Research', 'Mobile Design'],
+          temperament: 'empathetic', communicationStyle: 'visual',
+          background: '4 года дизайн, ex-Lamoda', approach: 'user-centric',
+        },
+      },
+      {
+        role: 'mrk', reason: 'Growth and customer acquisition',
+        position: {
+          functions: ['SEO', 'Paid ads', 'Email marketing'],
+          responsibilities: ['Traffic growth', 'Conversion optimization', 'Analytics'],
+          interactions: ['Receives from CEO', 'Coordinates with Designer'],
+          metrics: ['CAC <$15', 'ROAS >3x'],
+        },
+        personality: {
+          name: 'Катерина', gender: 'female', age: 29,
+          experience: 'Middle+', skills: ['SEO', 'Google Ads', 'Analytics'],
+          temperament: 'energetic', communicationStyle: 'persuasive',
+          background: '6 лет digital marketing', approach: 'data-driven',
+        },
+      },
+    ],
+  },
+
+  'HealthTech': {
+    businessModel: {
+      model: 'Subscription + per-patient fee',
+      reason: 'B2B healthcare needs predictable pricing with usage component.',
+    },
+    competitors: ['Doctolib', 'Zocdoc', 'СберЗдоровье', 'Medesk', 'Epic'],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Python (Django) / Node.js',
+      infra: 'AWS HIPAA, Docker',
+      db: 'PostgreSQL + MongoDB',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'HIPAA/security-compliant architecture',
+        position: {
+          functions: ['Architecture', 'Compliance', 'Data security'],
+          responsibilities: ['HIPAA compliance', 'Encryption', 'Audit'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Zero data breaches', 'Compliance 100%'],
+        },
+        personality: {
+          name: 'Михаил', gender: 'male', age: 36,
+          experience: 'Lead', skills: ['Security', 'Python', 'Cloud'],
+          temperament: 'cautious', communicationStyle: 'precise',
+          background: '11 лет healthtech', approach: 'compliance-first',
+        },
+      },
+      {
+        role: 'back', reason: 'Secure data processing and integrations',
+        position: {
+          functions: ['API development', 'HL7/FHIR', 'Data encryption'],
+          responsibilities: ['Patient data API', 'EHR integration', 'Audit logging'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['API uptime 99.99%', 'Data integrity 100%'],
+        },
+        personality: {
+          name: 'Артём', gender: 'male', age: 31,
+          experience: 'Senior', skills: ['Python', 'Django', 'HL7'],
+          temperament: 'meticulous', communicationStyle: 'detailed',
+          background: '7 лет healthcare backend', approach: 'standards-driven',
+        },
+      },
+      {
+        role: 'front', reason: 'Accessible medical interfaces',
+        position: {
+          functions: ['Patient portal', 'Doctor dashboard', 'Accessibility'],
+          responsibilities: ['WCAG compliance', 'Responsive design', 'Offline support'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['WCAG AA', 'Load time <2s'],
+        },
+        personality: {
+          name: 'Татьяна', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['React', 'Accessibility', 'TypeScript'],
+          temperament: 'patient', communicationStyle: 'clear',
+          background: '5 лет frontend, healthcare focus', approach: 'accessibility-first',
+        },
+      },
+      {
+        role: 'des', reason: 'Medical UX requires special care',
+        position: {
+          functions: ['Medical UI design', 'Patient flows', 'Data visualization'],
+          responsibilities: ['Wireframes', 'Usability testing', 'Accessibility'],
+          interactions: ['Receives from PM', 'Sends to Frontend'],
+          metrics: ['Error rate <1%', 'User satisfaction >90%'],
+        },
+        personality: {
+          name: 'Лиза', gender: 'female', age: 29,
+          experience: 'Middle+', skills: ['Figma', 'Medical UX', 'Data Viz'],
+          temperament: 'empathetic', communicationStyle: 'visual',
+          background: '5 лет UX в медтехе', approach: 'patient-centric',
+        },
+      },
+      {
+        role: 'qa', reason: 'Medical software needs thorough testing',
+        position: {
+          functions: ['Compliance testing', 'Security testing', 'Regression'],
+          responsibilities: ['Test automation', 'Penetration testing', 'Validation'],
+          interactions: ['Receives from PM', 'Reports to CTO'],
+          metrics: ['Coverage >95%', 'Zero critical bugs in prod'],
+        },
+        personality: {
+          name: 'Юлия', gender: 'female', age: 30,
+          experience: 'Senior', skills: ['Test Automation', 'Security', 'HIPAA'],
+          temperament: 'thorough', communicationStyle: 'structured',
+          background: '7 лет QA, медтех', approach: 'risk-based',
+        },
+      },
+    ],
+  },
+
+  'EdTech': {
+    businessModel: {
+      model: 'Freemium + Subscription',
+      reason: 'Free tier drives adoption among students; premium for institutions.',
+    },
+    competitors: ['Coursera', 'Skillbox', 'Duolingo', 'Khan Academy', 'Stepik'],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Node.js (NestJS)',
+      infra: 'Vercel + AWS',
+      db: 'PostgreSQL + Redis + S3',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Scalable learning platform',
+        position: {
+          functions: ['Architecture', 'Video streaming', 'Content delivery'],
+          responsibilities: ['System design', 'CDN setup', 'API design'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Video buffering <1%', 'Uptime 99.9%'],
+        },
+        personality: {
+          name: 'Николай', gender: 'male', age: 33,
+          experience: 'Senior', skills: ['Node.js', 'AWS', 'Streaming'],
+          temperament: 'innovative', communicationStyle: 'concise',
+          background: '8 лет edtech, ex-Skillbox', approach: 'product-driven',
+        },
+      },
+      {
+        role: 'front', reason: 'Engaging learning experience',
+        position: {
+          functions: ['Course player', 'Interactive exercises', 'Mobile UX'],
+          responsibilities: ['Video player', 'Gamification UI', 'Progress tracking'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Engagement rate >60%', 'Completion rate >30%'],
+        },
+        personality: {
+          name: 'Софья', gender: 'female', age: 26,
+          experience: 'Middle', skills: ['React', 'Animation', 'Canvas'],
+          temperament: 'creative', communicationStyle: 'enthusiastic',
+          background: '4 года frontend, edtech', approach: 'engagement-focused',
+        },
+      },
+      {
+        role: 'back', reason: 'Content management and progress tracking',
+        position: {
+          functions: ['Course API', 'Progress tracking', 'Assessment engine'],
+          responsibilities: ['Content storage', 'User progress', 'Certificates'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['API latency <200ms', 'Data consistency 100%'],
+        },
+        personality: {
+          name: 'Игорь', gender: 'male', age: 29,
+          experience: 'Middle+', skills: ['Node.js', 'PostgreSQL', 'S3'],
+          temperament: 'methodical', communicationStyle: 'technical',
+          background: '6 лет backend', approach: 'pragmatic',
+        },
+      },
+      {
+        role: 'des', reason: 'Learning UX must be intuitive and engaging',
+        position: {
+          functions: ['Course design', 'Gamification', 'Mobile design'],
+          responsibilities: ['Learning UX', 'Interaction design', 'Accessibility'],
+          interactions: ['Receives from PM', 'Sends to Frontend'],
+          metrics: ['User satisfaction >85%', 'Task completion >90%'],
+        },
+        personality: {
+          name: 'Алина', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['Figma', 'Gamification', 'UX Research'],
+          temperament: 'playful', communicationStyle: 'visual',
+          background: '5 лет дизайн, edtech', approach: 'learner-centric',
+        },
+      },
+      {
+        role: 'wr', reason: 'Course content and documentation',
+        position: {
+          functions: ['Course content', 'Documentation', 'Marketing copy'],
+          responsibilities: ['Lesson scripts', 'Help docs', 'Blog posts'],
+          interactions: ['Receives from PM', 'Coordinates with Designer'],
+          metrics: ['Content quality score >4/5', 'Publishing cadence weekly'],
+        },
+        personality: {
+          name: 'Полина', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['Technical Writing', 'Copywriting', 'SEO'],
+          temperament: 'articulate', communicationStyle: 'storytelling',
+          background: '5 лет контент, edtech', approach: 'clarity-focused',
+        },
+      },
+    ],
+  },
+
+  'GameDev': {
+    businessModel: {
+      model: 'Free-to-play + In-app purchases',
+      reason: 'F2P maximizes reach; monetize engaged players.',
+    },
+    competitors: ['Unity', 'Epic Games', 'Roblox', 'Supercell', 'Playrix'],
+    techStack: {
+      frontend: 'Unity / Unreal / Godot',
+      backend: 'Go / C# (ASP.NET)',
+      infra: 'AWS GameLift / GCP',
+      db: 'PostgreSQL + Redis + DynamoDB',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Game engine and infrastructure decisions',
+        position: {
+          functions: ['Engine selection', 'Architecture', 'Performance'],
+          responsibilities: ['Tech stack', 'Rendering pipeline', 'Multiplayer'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['60 FPS stable', 'Crash rate <0.1%'],
+        },
+        personality: {
+          name: 'Кирилл', gender: 'male', age: 34,
+          experience: 'Senior', skills: ['C++', 'Unity', 'Networking'],
+          temperament: 'passionate', communicationStyle: 'direct',
+          background: '10 лет gamedev, ex-Playrix', approach: 'performance-obsessed',
+        },
+      },
+      {
+        role: 'front', reason: 'Game UI and client-side logic',
+        position: {
+          functions: ['Game UI', 'Client logic', 'Animation'],
+          responsibilities: ['HUD', 'Menu systems', 'Shader effects'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['UI responsiveness <16ms', 'Memory usage optimized'],
+        },
+        personality: {
+          name: 'Артур', gender: 'male', age: 28,
+          experience: 'Middle+', skills: ['Unity', 'C#', 'Shader'],
+          temperament: 'creative', communicationStyle: 'visual',
+          background: '6 лет game client', approach: 'visual-quality',
+        },
+      },
+      {
+        role: 'back', reason: 'Multiplayer, leaderboards, game state',
+        position: {
+          functions: ['Game server', 'Matchmaking', 'Leaderboards'],
+          responsibilities: ['Real-time sync', 'Anti-cheat', 'Analytics'],
+          interactions: ['Receives from CTO', 'Coordinates with Client'],
+          metrics: ['Server tick <50ms', 'Cheater detection >95%'],
+        },
+        personality: {
+          name: 'Вадим', gender: 'male', age: 30,
+          experience: 'Senior', skills: ['Go', 'WebSocket', 'Redis'],
+          temperament: 'competitive', communicationStyle: 'concise',
+          background: '7 лет game servers', approach: 'low-latency',
+        },
+      },
+      {
+        role: 'des', reason: 'Game design and visual identity',
+        position: {
+          functions: ['Game design', 'Level design', 'UI/UX'],
+          responsibilities: ['Game mechanics', 'Balance', 'Visual style'],
+          interactions: ['Receives from PM', 'Sends to all teams'],
+          metrics: ['Session length >15min', 'Day-7 retention >20%'],
+        },
+        personality: {
+          name: 'Нина', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['Game Design', 'Figma', 'Photoshop'],
+          temperament: 'imaginative', communicationStyle: 'enthusiastic',
+          background: '5 лет game design', approach: 'fun-first',
+        },
+      },
+      {
+        role: 'qa', reason: 'Games need extensive testing',
+        position: {
+          functions: ['Gameplay testing', 'Performance testing', 'Compatibility'],
+          responsibilities: ['Bug tracking', 'Regression', 'Platform testing'],
+          interactions: ['Receives from PM', 'Reports to all teams'],
+          metrics: ['Critical bugs 0', 'Test coverage >80%'],
+        },
+        personality: {
+          name: 'Денис', gender: 'male', age: 26,
+          experience: 'Middle', skills: ['Manual Testing', 'Automation', 'Unity'],
+          temperament: 'persistent', communicationStyle: 'detailed',
+          background: '4 года QA в gamedev', approach: 'player-perspective',
+        },
+      },
+    ],
+  },
+
+  'Marketplace': {
+    businessModel: {
+      model: 'Commission per transaction',
+      reason: 'Standard for two-sided marketplaces; revenue grows with GMV.',
+    },
+    competitors: ['Airbnb', 'Uber', 'Avito', 'Fiverr', 'Etsy'],
+    techStack: {
+      frontend: 'Next.js + TypeScript',
+      backend: 'Node.js (NestJS)',
+      infra: 'AWS / GCP',
+      db: 'PostgreSQL + Elasticsearch + Redis',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Two-sided platform architecture',
+        position: {
+          functions: ['Architecture', 'Search/matching', 'Payments'],
+          responsibilities: ['System design', 'Scaling', 'Trust & Safety'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['Platform uptime 99.9%', 'Search latency <200ms'],
+        },
+        personality: {
+          name: 'Евгений', gender: 'male', age: 35,
+          experience: 'Senior', skills: ['Microservices', 'Elasticsearch', 'Node.js'],
+          temperament: 'strategic', communicationStyle: 'structured',
+          background: '10 лет marketplace, ex-Avito', approach: 'scale-thinking',
+        },
+      },
+      {
+        role: 'front', reason: 'Conversion-focused buyer and seller UIs',
+        position: {
+          functions: ['Buyer UI', 'Seller dashboard', 'Search UI'],
+          responsibilities: ['Responsive design', 'Performance', 'SEO'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Time to first listing <3min', 'Bounce rate <35%'],
+        },
+        personality: {
+          name: 'Валерия', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['Next.js', 'React', 'CSS'],
+          temperament: 'detail-oriented', communicationStyle: 'visual',
+          background: '5 лет frontend, marketplace', approach: 'conversion-focused',
+        },
+      },
+      {
+        role: 'back', reason: 'Matching, payments, trust systems',
+        position: {
+          functions: ['Matching API', 'Payment processing', 'Review system'],
+          responsibilities: ['Transaction safety', 'Dispute resolution', 'Analytics'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['Transaction success >99%', 'Dispute resolution <24h'],
+        },
+        personality: {
+          name: 'Тимур', gender: 'male', age: 31,
+          experience: 'Senior', skills: ['Node.js', 'PostgreSQL', 'Stripe'],
+          temperament: 'reliable', communicationStyle: 'technical',
+          background: '7 лет backend, ex-Uber', approach: 'trust-first',
+        },
+      },
+      {
+        role: 'mrk', reason: 'Two-sided acquisition is critical',
+        position: {
+          functions: ['Supply acquisition', 'Demand generation', 'SEO'],
+          responsibilities: ['Growth loops', 'Referral programs', 'Content'],
+          interactions: ['Receives from CEO', 'Coordinates with Designer'],
+          metrics: ['Supply growth >10%/mo', 'CAC payback <6mo'],
+        },
+        personality: {
+          name: 'Настя', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['Growth', 'SEO', 'Analytics'],
+          temperament: 'energetic', communicationStyle: 'persuasive',
+          background: '5 лет growth marketing', approach: 'experiment-driven',
+        },
+      },
+      {
+        role: 'pm', reason: 'Complex two-sided product management',
+        position: {
+          functions: ['Roadmap', 'Marketplace dynamics', 'Metrics'],
+          responsibilities: ['Feature specs', 'A/B testing', 'Stakeholder management'],
+          interactions: ['Receives from CEO', 'Assigns to teams'],
+          metrics: ['Liquidity ratio >60%', 'NPS >40'],
+        },
+        personality: {
+          name: 'Анастасия', gender: 'female', age: 30,
+          experience: 'Senior', skills: ['Marketplace Ops', 'Analytics', 'Agile'],
+          temperament: 'balanced', communicationStyle: 'clear',
+          background: '7 лет PM в marketplace', approach: 'metrics-driven',
+        },
+      },
+    ],
+  },
+
+  'DevTools': {
+    businessModel: {
+      model: 'Open-core + Usage-based',
+      reason: 'Free OSS drives adoption; premium features and usage for revenue.',
+    },
+    competitors: ['GitHub', 'Vercel', 'Supabase', 'Datadog', 'PlanetScale'],
+    techStack: {
+      frontend: 'React + TypeScript',
+      backend: 'Rust / Go',
+      infra: 'Fly.io / AWS',
+      db: 'PostgreSQL + ClickHouse + Redis',
+    },
+    teamComposition: [
+      {
+        role: 'cto', reason: 'Developer-facing product needs great architecture',
+        position: {
+          functions: ['Architecture', 'OSS strategy', 'DX'],
+          responsibilities: ['CLI design', 'SDK APIs', 'Performance'],
+          interactions: ['Receives from CEO', 'Delegates to engineers'],
+          metrics: ['CLI latency <100ms', 'SDK adoption rate'],
+        },
+        personality: {
+          name: 'Глеб', gender: 'male', age: 32,
+          experience: 'Senior', skills: ['Rust', 'Go', 'System Design'],
+          temperament: 'perfectionist', communicationStyle: 'technical',
+          background: '9 лет devtools, OSS contributor', approach: 'DX-obsessed',
+        },
+      },
+      {
+        role: 'back', reason: 'Core platform and APIs',
+        position: {
+          functions: ['Platform API', 'CLI backend', 'Webhooks'],
+          responsibilities: ['API design', 'Rate limiting', 'Multi-tenancy'],
+          interactions: ['Receives from CTO', 'Coordinates with Frontend'],
+          metrics: ['API p99 <100ms', 'SDK coverage >90%'],
+        },
+        personality: {
+          name: 'Фёдор', gender: 'male', age: 30,
+          experience: 'Senior', skills: ['Go', 'gRPC', 'PostgreSQL'],
+          temperament: 'systematic', communicationStyle: 'concise',
+          background: '7 лет platform eng', approach: 'API-first',
+        },
+      },
+      {
+        role: 'front', reason: 'Developer dashboard and documentation site',
+        position: {
+          functions: ['Dashboard', 'Docs site', 'Code playground'],
+          responsibilities: ['DX', 'Interactive docs', 'Dark mode'],
+          interactions: ['Receives from Designer', 'Coordinates with Backend'],
+          metrics: ['Docs satisfaction >90%', 'Onboarding <5min'],
+        },
+        personality: {
+          name: 'Лена', gender: 'female', age: 27,
+          experience: 'Middle+', skills: ['React', 'MDX', 'Storybook'],
+          temperament: 'meticulous', communicationStyle: 'clear',
+          background: '5 лет frontend, devtools', approach: 'docs-driven',
+        },
+      },
+      {
+        role: 'wr', reason: 'Great docs are essential for developer adoption',
+        position: {
+          functions: ['API docs', 'Tutorials', 'Changelogs'],
+          responsibilities: ['Documentation', 'Code examples', 'Blog'],
+          interactions: ['Receives from PM', 'Coordinates with engineers'],
+          metrics: ['Docs coverage 100%', 'Tutorial completion >70%'],
+        },
+        personality: {
+          name: 'Света', gender: 'female', age: 28,
+          experience: 'Middle+', skills: ['Technical Writing', 'MDX', 'API Docs'],
+          temperament: 'precise', communicationStyle: 'educational',
+          background: '5 лет tech writing, OSS', approach: 'example-driven',
+        },
+      },
+      {
+        role: 'ops', reason: 'Reliable infrastructure for developer tools',
+        position: {
+          functions: ['CI/CD', 'Multi-region', 'Observability'],
+          responsibilities: ['Uptime', 'Deploy pipeline', 'Cost optimization'],
+          interactions: ['Receives from CTO', 'Supports all teams'],
+          metrics: ['Uptime 99.99%', 'Deploy time <3min'],
+        },
+        personality: {
+          name: 'Данил', gender: 'male', age: 31,
+          experience: 'Senior', skills: ['Fly.io', 'Terraform', 'Prometheus'],
+          temperament: 'reliable', communicationStyle: 'structured',
+          background: '7 лет SRE/DevOps', approach: 'automation-first',
+        },
+      },
+    ],
+  },
+}
