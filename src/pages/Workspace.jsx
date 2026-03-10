@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react'
-import { WORKSPACE_TABS } from '../data/constants'
+import { WORKSPACE_TABS, DESKS } from '../data/constants'
 import { useTheme } from '../hooks/useTheme'
+import { useApp } from '../context/AppContext'
 import RoleIcon from '../components/RoleIcon'
-import Avatar from '../components/Avatar'
 import ChatPanel from '../components/ChatPanel'
 import KanbanBoard from '../components/KanbanBoard'
 import RoadmapView from '../components/RoadmapView'
@@ -12,27 +12,30 @@ import CalendarView from '../components/CalendarView'
 import PitchStudio from '../components/PitchStudio'
 import WikiView from '../components/WikiView'
 
+function getInitials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
+}
+
 export default function Workspace({ project, team }) {
+  const { state, dispatch } = useApp()
   const [activeTab, setActiveTab] = useState('chat')
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggle: toggleTheme } = useTheme()
 
-  const [tasks, setTasks] = useState(() =>
-    team.map((m, i) => ({
-      id: `T-${String(i + 1).padStart(3, '0')}`,
-      title: `Setup: ${m.pn || m.label}`,
-      as: m.id + m.slot,
-      pr: i < 2 ? 'P0' : 'P1',
-      col: 'todo',
-      tags: ['setup'],
-    }))
-  )
-
-  const addTask = (t) => setTasks((p) => [...p, t])
+  const tasks = state.tasks || []
+  const setTasks = (newTasks) => {
+    if (typeof newTasks === 'function') {
+      dispatch({ type: 'SET_TASKS', payload: newTasks(tasks) })
+    } else {
+      dispatch({ type: 'SET_TASKS', payload: newTasks })
+    }
+  }
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'chat': return <ChatPanel project={project} team={team} tasks={tasks} onAddTask={addTask} />
+      case 'chat': return <ChatPanel />
       case 'kanban': return <KanbanBoard team={team} tasks={tasks} onSetTasks={setTasks} />
       case 'road': return <RoadmapView />
       case 'econ': return <EconomicsView />
@@ -100,20 +103,31 @@ export default function Workspace({ project, team }) {
           {!collapsed && (
             <div className="px-4 py-3">
               <div className="text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Команда</div>
-              {team.map((m) => (
-                <div
-                  key={m.id + m.slot}
-                  className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors"
-                >
-                  <div className="relative shrink-0">
-                    <Avatar person={m.per} size={28} />
-                    <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
+              {team.map((t) => {
+                const name = t.personality?.name || t.label
+                const desk = DESKS.find(d => d.id === (t.role || t.id))
+                const color = desk?.color || t.color || 'var(--ac)'
+                const initials = getInitials(name)
+                return (
+                  <div
+                    key={t.id || t.role}
+                    className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors"
+                  >
+                    <div className="relative shrink-0">
+                      <div
+                        className="flex items-center justify-center rounded-full font-bold text-[10px] select-none"
+                        style={{ width: 28, height: 28, background: `${color}22`, color }}
+                      >
+                        {initials}
+                      </div>
+                      <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
+                    </div>
+                    <span className="text-[13px] font-medium text-[var(--t)] truncate">
+                      {name}
+                    </span>
                   </div>
-                  <span className="text-[13px] font-medium text-[var(--t)] truncate">
-                    {m.pn || m.label}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

@@ -39,6 +39,7 @@ export const CHANNELS = {
   eng: { name: 'Engineering', iconName: 'Settings' },
   prod: { name: 'Product', iconName: 'BarChart2' },
   stand: { name: 'Standup', iconName: 'Clipboard' },
+  meeting: { name: 'Meeting Room', iconName: 'Users' },
 }
 
 // Kanban columns

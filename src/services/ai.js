@@ -3,6 +3,7 @@ import { DESKS } from '../data/constants.js'
 // ─── Anthropic API config ───────────────────────────────────────────
 const RECOMMEND_URL = '/api/recommend'
 const GENERATE_URL = '/api/generate'
+const CHAT_URL = '/api/chat'
 const MODEL = 'claude-sonnet-4-20250514'
 
 // ─── generateRecommendations ────────────────────────────────────────
@@ -44,6 +45,115 @@ export async function generateWorkspaceContent(project, team) {
     console.warn('AI workspace generation unavailable, using fallback:', err.message)
     return generateFallbackWorkspace(project, team)
   }
+}
+
+// ─── chatWithAgent ──────────────────────────────────────────────────
+// Sends a message to an agent and returns their response
+export async function chatWithAgent(agent, userMessage, context) {
+  const systemPrompt = agent.systemPrompt || `Ты ${agent.personality?.name || agent.label}, ${agent.label} проекта. Отвечай кратко и по делу.`
+
+  // Build conversation from last 10 messages
+  const recentMsgs = (context.recentMessages || []).slice(-10)
+  const messages = recentMsgs.map(m => ({
+    role: m.from === 'user' ? 'user' : 'assistant',
+    content: m.text,
+  }))
+  messages.push({ role: 'user', content: userMessage })
+
+  try {
+    const res = await fetch(CHAT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt,
+        messages,
+        model: agent.model || MODEL,
+      }),
+    })
+
+    if (!res.ok) throw new Error(`API ${res.status}`)
+
+    const data = await res.json()
+    return data.reply || 'Не удалось получить ответ.'
+  } catch (err) {
+    console.warn('Chat API unavailable, using fallback:', err.message)
+    return generateFallbackChat(agent, userMessage, context)
+  }
+}
+
+// ─── Fallback chat responses ────────────────────────────────────────
+function generateFallbackChat(agent, userMessage, context) {
+  const name = agent.personality?.name || agent.label
+  const role = agent.role || agent.id
+  const projectName = context.projectName || 'проект'
+  const msg = userMessage.toLowerCase()
+
+  const ROLE_RESPONSES = {
+    ceo: [
+      `Хороший вопрос. С точки зрения стратегии ${projectName}, я считаю что нам нужно сфокусироваться на ключевых метриках роста.`,
+      `Давай обсудим это на следующем стендапе. Приоритет сейчас — запуск MVP и первые пользователи.`,
+      `Я вижу возможности для роста здесь. Давай выделим это в отдельную задачу и приоритизируем.`,
+    ],
+    cto: [
+      `С технической точки зрения, я предлагаю начать с простой архитектуры и итерировать.`,
+      `Нужно учесть масштабируемость. Давай продумаем это на уровне архитектуры.`,
+      `Хорошая идея. Предлагаю сделать прототип и оценить производительность.`,
+    ],
+    back: [
+      `Я могу реализовать это через REST API. Оценка — примерно 2-3 дня.`,
+      `Нужно подумать о структуре базы данных. Предлагаю PostgreSQL с нормальной индексацией.`,
+      `Сделаю эндпоинт и напишу тесты. Начну сегодня.`,
+    ],
+    front: [
+      `Могу сверстать это с анимациями за 1-2 дня. Нужен дизайн от дизайнера.`,
+      `Предлагаю использовать компонентный подход. Создам переиспользуемые элементы.`,
+      `Адаптив и доступность учту. Начну с мобильной версии.`,
+    ],
+    pm: [
+      `Добавлю это в бэклог. Приоритет определим на планировании.`,
+      `По текущему роадмапу это вписывается в Phase 2. Обновлю доску.`,
+      `Хорошо, создам задачу и распределю между командой. Дедлайн обсудим.`,
+    ],
+    des: [
+      `Набросаю wireframe и покажу завтра. Начну с user flow.`,
+      `С точки зрения UX, предлагаю упростить этот флоу. Меньше шагов — лучше конверсия.`,
+      `Подготовлю мокапы в Figma. Учту наш дизайн-систему.`,
+    ],
+    ops: [
+      `Настрою CI/CD пайплайн для этого. Деплой будет автоматический.`,
+      `Мониторинг добавлю. Алерты настрою на критичные метрики.`,
+      `Инфраструктура готова. Могу масштабировать если нужно.`,
+    ],
+    ml: [
+      `Могу обучить модель для этой задачи. Нужны данные для тренировки.`,
+      `Предлагаю начать с простого подхода и итерировать на основе метрик.`,
+      `Подготовлю пайплайн для обработки данных. Оценка точности будет через неделю.`,
+    ],
+    mrk: [
+      `Подготовлю маркетинговый план для запуска. SEO + контент + paid ads.`,
+      `Давайте замерим конверсию текущего лендинга и оптимизируем.`,
+      `Создам контент-план на месяц. Фокус на целевую аудиторию.`,
+    ],
+    wr: [
+      `Напишу документацию к этому модулю. README + API docs.`,
+      `Подготовлю текст для лендинга. Нужен бриф от маркетолога.`,
+      `Обновлю вики. Добавлю раздел по этой теме.`,
+    ],
+    qa: [
+      `Напишу тест-кейсы для этого функционала. Автотесты тоже покрою.`,
+      `Нашёл пару edge cases. Создам баг-репорты.`,
+      `Регрессионное тестирование проведу перед релизом.`,
+    ],
+    mob: [
+      `Реализую это на React Native. Поддержка iOS и Android.`,
+      `Оптимизирую перформанс. Lazy loading и кэширование.`,
+      `Начну с iOS версии, потом адаптирую под Android.`,
+    ],
+  }
+
+  const responses = ROLE_RESPONSES[role] || ROLE_RESPONSES.ceo
+  const idx = Math.abs(userMessage.length + (context.recentMessages?.length || 0)) % responses.length
+  return `${responses[idx]}`
 }
 
 // ─── Fallback workspace content ─────────────────────────────────────
