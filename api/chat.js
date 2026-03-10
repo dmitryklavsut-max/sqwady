@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' })
   }
 
-  const { systemPrompt, messages, model } = req.body
+  const { systemPrompt, messages, model, temperature } = req.body
   if (!systemPrompt || !messages) {
     return res.status(400).json({ error: 'Missing systemPrompt or messages' })
   }
@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-20250514',
         max_tokens: 1024,
+        temperature: temperature ?? 0.5,
         system: systemPrompt,
         messages,
       }),

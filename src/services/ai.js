@@ -49,16 +49,22 @@ export async function generateWorkspaceContent(project, team) {
 
 // ─── chatWithAgent ──────────────────────────────────────────────────
 // Sends a message to an agent and returns their response
+// context: { recentMessages, project, memoryFiles }
 export async function chatWithAgent(agent, userMessage, context) {
-  const systemPrompt = agent.systemPrompt || `Ты ${agent.personality?.name || agent.label}, ${agent.label} проекта. Отвечай кратко и по делу.`
+  const systemPrompt = buildRichSystemPrompt(agent, context)
 
-  // Build conversation from last 10 messages
-  const recentMsgs = (context.recentMessages || []).slice(-10)
+  // Build conversation from last 15 messages
+  const recentMsgs = (context.recentMessages || []).slice(-15)
   const messages = recentMsgs.map(m => ({
     role: m.from === 'user' ? 'user' : 'assistant',
-    content: m.text,
+    content: m.from === 'user' ? m.text : `[${m.name || 'agent'}]: ${m.text}`,
   }))
   messages.push({ role: 'user', content: userMessage })
+
+  // Analytical roles get lower temperature
+  const role = agent.role || agent.id
+  const analyticalRoles = ['cto', 'back', 'ml', 'ops', 'qa']
+  const temperature = analyticalRoles.includes(role) ? 0.3 : 0.7
 
   try {
     const res = await fetch(CHAT_URL, {
@@ -68,6 +74,7 @@ export async function chatWithAgent(agent, userMessage, context) {
         systemPrompt,
         messages,
         model: agent.model || MODEL,
+        temperature,
       }),
     })
 
@@ -81,79 +88,167 @@ export async function chatWithAgent(agent, userMessage, context) {
   }
 }
 
-// ─── Fallback chat responses ────────────────────────────────────────
+// ─── Build rich system prompt with full context ──────────────────────
+function buildRichSystemPrompt(agent, context) {
+  const p = agent.personality || {}
+  const pos = agent.position || {}
+  const proj = context.project || {}
+  const mem = context.memoryFiles || {}
+
+  const name = p.name || agent.label
+  const roleName = agent.label || (agent.role || agent.id)
+
+  let prompt = `Ты ${name}, ${roleName} в стартапе "${proj.name || 'проект'}".
+
+ПРОЕКТ: ${proj.description || 'Стартап проект'}
+Сфера: ${proj.industry || 'Tech'}, Стадия: ${proj.stage || 'MVP'}
+Целевая аудитория: ${proj.audience || 'разработчики и бизнес'}
+MVP фичи: ${proj.mvpFeatures || 'core features'}
+Стек: ${proj.techStack || 'не определён'}
+Бизнес-модель: ${proj.businessModel || 'не определена'}
+Конкуренты: ${proj.competitors || 'не определены'}
+Конкурентное преимущество: ${proj.advantage || 'не определено'}`
+
+  if (pos.functions?.length) {
+    prompt += `\n\nТВОЯ ДОЛЖНОСТЬ:\nФункции: ${Array.isArray(pos.functions) ? pos.functions.join(', ') : pos.functions}`
+  }
+  if (pos.responsibilities?.length) {
+    prompt += `\nОтветственности: ${Array.isArray(pos.responsibilities) ? pos.responsibilities.join(', ') : pos.responsibilities}`
+  }
+  if (p.skills?.length) {
+    prompt += `\nТВОИ СКИЛЫ: ${Array.isArray(p.skills) ? p.skills.join(', ') : p.skills}`
+  }
+  if (p.background) prompt += `\nТВОЙ ОПЫТ: ${p.background}`
+  if (p.communicationStyle || p.temperament) {
+    prompt += `\nСТИЛЬ: ${p.communicationStyle || ''} ${p.temperament || ''}`
+  }
+
+  // Add project knowledge from memory files
+  if (mem.PROJECT) prompt += `\n\nПРОЕКТ ДОКУМЕНТ:\n${mem.PROJECT}`
+  if (mem.ARCHITECTURE) prompt += `\n\nАРХИТЕКТУРА:\n${mem.ARCHITECTURE}`
+
+  // Add agent's own memory if available
+  const agentId = agent.role || agent.id
+  const agentMem = mem.agents?.[agentId]
+  if (agentMem?.memory) prompt += `\n\nТВОЯ ПАМЯТЬ:\n${agentMem.memory}`
+
+  prompt += `
+
+ПРАВИЛА:
+- Отвечай как реальный профессионал на своей позиции.
+- Используй знания о проекте. Давай конкретные рекомендации.
+- Отвечай на русском, кратко но содержательно (3-7 предложений).
+- Если обсуждается архитектура — предлагай конкретные решения для ${proj.techStack || 'текущего стека'}.
+- Если обсуждается стратегия — ссылайся на рынок и конкурентов.
+- НЕ говори что ты AI. Ты — член команды.`
+
+  return prompt
+}
+
+// ─── Fallback chat responses (project-aware) ────────────────────────
 function generateFallbackChat(agent, userMessage, context) {
-  const name = agent.personality?.name || agent.label
   const role = agent.role || agent.id
-  const projectName = context.projectName || 'проект'
+  const proj = context.project || {}
+  const pName = proj.name || 'проект'
+  const stack = proj.techStack || 'текущий стек'
+  const features = proj.mvpFeatures || 'ключевые фичи'
+  const competitors = proj.competitors || 'основные конкуренты'
+  const industry = proj.industry || 'индустрия'
+  const audience = proj.audience || 'целевая аудитория'
+  const model = proj.businessModel || 'бизнес-модель'
+  const advantage = proj.advantage || 'наше конкурентное преимущество'
   const msg = userMessage.toLowerCase()
 
   const ROLE_RESPONSES = {
     ceo: [
-      `Хороший вопрос. С точки зрения стратегии ${projectName}, я считаю что нам нужно сфокусироваться на ключевых метриках роста.`,
-      `Давай обсудим это на следующем стендапе. Приоритет сейчас — запуск MVP и первые пользователи.`,
-      `Я вижу возможности для роста здесь. Давай выделим это в отдельную задачу и приоритизируем.`,
+      `Отличный вопрос для ${pName}. Наше преимущество — ${advantage}. Нужно использовать это в позиционировании перед ${competitors}. Давай обсудим детали на следующем стендапе.`,
+      `С учётом нашей ${model} модели и рынка ${industry}, я предлагаю сфокусироваться на привлечении первых платящих клиентов. ${audience} — наш приоритет.`,
+      `Смотри, ${competitors} уже активны на рынке. Но у ${pName} есть чёткое преимущество: ${advantage}. Это наш ключевой дифференциатор.`,
+      `Я провёл анализ — рынок ${industry} растёт. Для ${pName} критично выйти с MVP в ближайшие ${proj.timeline || '3 месяца'}. Приоритизируем ${features}.`,
+      `Инвесторам важно показать traction. Для ${pName} на стадии ${proj.stage || 'MVP'} ключевые метрики — DAU и retention. Давай определим targets.`,
     ],
     cto: [
-      `С технической точки зрения, я предлагаю начать с простой архитектуры и итерировать.`,
-      `Нужно учесть масштабируемость. Давай продумаем это на уровне архитектуры.`,
-      `Хорошая идея. Предлагаю сделать прототип и оценить производительность.`,
+      `Для ${pName} оптимальная архитектура на ${stack}. Предлагаю начать с микросервисов для ${features}. Это даст нам гибкость масштабирования.`,
+      `Учитывая наш стек ${stack}, рекомендую трёхслойную архитектуру: API Gateway → Business Logic → Data Layer. Для MVP этого достаточно.`,
+      `С точки зрения перформанса ${pName}: кэширование на уровне Redis, CDN для статики, и lazy loading на фронте. Целевой latency < 200ms.`,
+      `Масштабируемость — наш приоритет. ${stack} позволяет горизонтальное масштабирование. Для ${features} добавим очереди сообщений.`,
+      `Посмотрел как ${competitors} решают это — у нас есть техническое преимущество с ${stack}. Предлагаю прототип за спринт и нагрузочные тесты.`,
     ],
     back: [
-      `Я могу реализовать это через REST API. Оценка — примерно 2-3 дня.`,
-      `Нужно подумать о структуре базы данных. Предлагаю PostgreSQL с нормальной индексацией.`,
-      `Сделаю эндпоинт и напишу тесты. Начну сегодня.`,
+      `Для реализации ${features} на ${stack} — начну с API endpoints. REST + JSON Schema для валидации. Оценка: 3-4 дня на core API.`,
+      `Схема БД для ${pName} готова в голове: users, sessions, core entities для ${features}. Миграции напишу сегодня, завтра — endpoints.`,
+      `На ${stack} реализую аутентификацию (JWT + refresh tokens), CRUD для основных сущностей, и вебхуки для интеграций. Тесты включены.`,
+      `Для ${pName} важна надёжность API. Добавлю rate limiting, error handling, и логирование. Мониторинг метрик через Prometheus.`,
+      `Предлагаю паттерн Repository + Service Layer для ${pName}. Это упростит тестирование и позволит легко менять хранилище данных.`,
     ],
     front: [
-      `Могу сверстать это с анимациями за 1-2 дня. Нужен дизайн от дизайнера.`,
-      `Предлагаю использовать компонентный подход. Создам переиспользуемые элементы.`,
-      `Адаптив и доступность учту. Начну с мобильной версии.`,
+      `Для ${pName} сделаю компонентную библиотеку: кнопки, формы, карточки, навигация. Адаптив под мобилки. Accessibility по WCAG 2.1.`,
+      `С учётом ${audience}, UX должен быть максимально простым. Предлагаю: онбординг в 3 шага, dashboard с ключевыми метриками, быстрые действия.`,
+      `На ${stack} соберу UI-kit за 2 дня. Storybook для документации компонентов. Тёмная и светлая темы из коробки.`,
+      `Для лендинга ${pName}: hero секция с value proposition, демо-видео, pricing table, testimonials. Оптимизирую под Core Web Vitals.`,
+      `Реализую ${features} с прогрессивной загрузкой. Code splitting для каждого модуля. Bundle size — под контролем.`,
     ],
     pm: [
-      `Добавлю это в бэклог. Приоритет определим на планировании.`,
-      `По текущему роадмапу это вписывается в Phase 2. Обновлю доску.`,
-      `Хорошо, создам задачу и распределю между командой. Дедлайн обсудим.`,
+      `Добавила "${msg.slice(0, 40)}..." в бэклог ${pName}. Приоритизирую по RICE: Reach × Impact × Confidence / Effort. Обсудим на планировании.`,
+      `По роадмапу ${pName}: Phase 1 — MVP (${features}), Phase 2 — Beta с первыми пользователями из ${audience}. Спринты по 2 недели.`,
+      `Для ${pName} на стадии ${proj.stage || 'MVP'} ключевое — скорость итераций. Предлагаю kanban вместо скрама, WIP лимит 3. Деплой каждый день.`,
+      `Конкурентный анализ: ${competitors} — их сильные стороны нужно учесть. Но наш фокус на ${advantage} даёт нам нишу.`,
+      `Метрики для ${pName}: activation rate, D7 retention, NPS. Настрою трекинг в первом спринте. Цель — data-driven решения.`,
     ],
     des: [
-      `Набросаю wireframe и покажу завтра. Начну с user flow.`,
-      `С точки зрения UX, предлагаю упростить этот флоу. Меньше шагов — лучше конверсия.`,
-      `Подготовлю мокапы в Figma. Учту наш дизайн-систему.`,
+      `Для ${pName} предлагаю минималистичный дизайн — ${audience} ценит функциональность. Dark mode по умолчанию, accent color — indigo.`,
+      `Wireframes для ${features}: главный экран → список → детали → действие. Максимум 3 клика до целевого действия.`,
+      `UX исследование: ${competitors} делают интерфейс сложным. Для ${pName} упрощаю: один CTA на экран, прогрессивное раскрытие.`,
+      `Дизайн-система ${pName}: 8px grid, typography scale, color tokens. Компоненты в Figma с auto-layout. Передам в dev за 2 дня.`,
+      `Mobile-first подход для ${pName}. ${audience} часто работает с телефона. Gesture-based навигация, адаптивные таблицы.`,
     ],
     ops: [
-      `Настрою CI/CD пайплайн для этого. Деплой будет автоматический.`,
-      `Мониторинг добавлю. Алерты настрою на критичные метрики.`,
-      `Инфраструктура готова. Могу масштабировать если нужно.`,
+      `CI/CD для ${pName}: GitHub Actions → Docker build → staging → production. Auto-rollback при падении health checks. На ${stack} это стандартно.`,
+      `Инфраструктура ${pName}: Kubernetes кластер, auto-scaling на основе CPU/memory. Terraform для IaC. Мониторинг через Grafana + Prometheus.`,
+      `Безопасность ${pName}: SSL/TLS, secrets в Vault, network policies в K8s. Сканирование зависимостей в CI. OWASP Top 10 закрыто.`,
+      `Для ${stack} настрою: staging environment = копия prod, feature branches с preview deployments, database backups каждые 6 часов.`,
+      `Alerting для ${pName}: latency > 500ms, error rate > 1%, disk > 80%. PagerDuty интеграция для on-call. SLA 99.9%.`,
     ],
     ml: [
-      `Могу обучить модель для этой задачи. Нужны данные для тренировки.`,
-      `Предлагаю начать с простого подхода и итерировать на основе метрик.`,
-      `Подготовлю пайплайн для обработки данных. Оценка точности будет через неделю.`,
+      `Для ${pName} предлагаю начать с baseline модели. ${features} можно реализовать через fine-tuning существующей модели. Данные — ключевое.`,
+      `ML pipeline для ${pName}: сбор данных → preprocessing → training → evaluation → deployment. MLflow для трекинга экспериментов.`,
+      `На ${stack} реализую inference API с батчингом. Модель развернём за GPU-инстансом с auto-scaling. Latency target < 100ms.`,
+      `A/B тестирование моделей для ${pName}: challenger vs champion. Метрики качества: precision, recall, F1. Автоматический rollout лучшей модели.`,
+      `Feature engineering для ${pName}: из данных ${audience} извлечём поведенческие паттерны. Это улучшит ${features} на 20-30% по ключевым метрикам.`,
     ],
     mrk: [
-      `Подготовлю маркетинговый план для запуска. SEO + контент + paid ads.`,
-      `Давайте замерим конверсию текущего лендинга и оптимизируем.`,
-      `Создам контент-план на месяц. Фокус на целевую аудиторию.`,
+      `Маркетинг-план ${pName}: SEO + контент-маркетинг для ${audience}. LinkedIn и Twitter для B2B. Product Hunt на запуске. CAC target < $50.`,
+      `Конкурентный анализ: ${competitors} тратят на paid ads. Для ${pName} предлагаю organic-first подход: developer relations, open-source, блог.`,
+      `Landing page ${pName}: headline про ${advantage}, social proof, demo CTA. A/B тестирую 3 варианта. Цель — 5% conversion rate.`,
+      `Email nurturing для ${pName}: welcome series 5 писем, product updates, case studies. Сегментация по ${audience}. Open rate target > 30%.`,
+      `Контент-стратегия: технический блог о ${industry}, видео-туториалы по ${features}, выступления на конференциях. Строим thought leadership.`,
     ],
     wr: [
-      `Напишу документацию к этому модулю. README + API docs.`,
-      `Подготовлю текст для лендинга. Нужен бриф от маркетолога.`,
-      `Обновлю вики. Добавлю раздел по этой теме.`,
+      `Документация ${pName}: Quick Start Guide, API Reference, Architecture Decision Records. Всё в формате Markdown, версионируется с кодом.`,
+      `Для ${audience} напишу: onboarding tutorial (5 минут до "aha moment"), FAQ по ${features}, troubleshooting guide. Ясный, технический язык.`,
+      `README для ${pName}: badges, installation, quick start, configuration, API examples. Contributing guide для open-source.`,
+      `Копирайтинг: лендинг ${pName} — USP в заголовке, ${advantage} в подзаголовке, 3 ключевых benefit'а, pricing table, FAQ.`,
+      `Внутренняя wiki ${pName}: team agreements, architecture overview, deployment guide, incident response playbook. Обновляю еженедельно.`,
     ],
     qa: [
-      `Напишу тест-кейсы для этого функционала. Автотесты тоже покрою.`,
-      `Нашёл пару edge cases. Создам баг-репорты.`,
-      `Регрессионное тестирование проведу перед релизом.`,
+      `Тест-план ${pName}: unit тесты > 80% coverage, integration тесты для ${features}, E2E — критические user flows. PyTest + Playwright.`,
+      `Для ${pName} на ${stack} настрою: pre-commit hooks (lint + format), CI тесты, smoke tests после деплоя. Регрессия — перед каждым релизом.`,
+      `Нашёл потенциальные проблемы: edge cases в ${features}, нагрузка при масштабировании, race conditions. Создам баг-репорты с repro steps.`,
+      `Performance тестирование ${pName}: k6 для load tests, target — 1000 RPS с p99 < 500ms. Профилирование узких мест в API.`,
+      `Security testing для ${pName}: OWASP ZAP scan, dependency audit, penetration testing API endpoints. Отчёт с severity levels.`,
     ],
     mob: [
-      `Реализую это на React Native. Поддержка iOS и Android.`,
-      `Оптимизирую перформанс. Lazy loading и кэширование.`,
-      `Начну с iOS версии, потом адаптирую под Android.`,
+      `Mobile app ${pName}: React Native для кросс-платформы. ${features} адаптирую под мобильный UX. Push notifications для engagement.`,
+      `Для ${audience}: offline mode, быстрая загрузка, biometric auth. Оптимизирую под слабый интернет — кэширование + progressive loading.`,
+      `App Store подготовка: скриншоты, описание на ${pName}, ASO оптимизация. TestFlight для beta. Release cycle — каждые 2 недели.`,
+      `Перформанс мобильного ${pName}: FPS > 60, startup < 2s, memory footprint < 100MB. Hermes engine для Android, JSC для iOS.`,
+      `Нативные модули для ${features}: камера, геолокация, push. Bridge через Turbo Modules. Тесты на реальных устройствах.`,
     ],
   }
 
   const responses = ROLE_RESPONSES[role] || ROLE_RESPONSES.ceo
-  const idx = Math.abs(userMessage.length + (context.recentMessages?.length || 0)) % responses.length
-  return `${responses[idx]}`
+  const seed = (userMessage.length * 7 + (context.recentMessages?.length || 0) * 13) % responses.length
+  return responses[seed]
 }
 
 // ─── Fallback workspace content ─────────────────────────────────────
@@ -295,12 +390,33 @@ function generateFallbackWorkspace(project, team) {
     addMsg('stand', role, `${pname}: Вчера — настройка окружения. Сегодня — начинаю работу над первыми задачами.`)
   })
 
-  // Memory files
+  // Memory files — project-level
   const memoryFiles = {
-    PROJECT: `# ${name}\n\n${desc}\n\n## Данные\n- Индустрия: ${project.industry || 'N/A'}\n- Стадия: ${project.stage || 'N/A'}\n- Аудитория: ${project.audience || 'N/A'}\n- Модель: ${model}\n- Стек: ${stack}\n- MVP фичи: ${features.join(', ') || 'N/A'}\n- Таймлайн: ${timeline}\n- Бюджет: ${project.budget || 'N/A'}`,
-    ARCHITECTURE: `# Архитектура ${name}\n\n## Стек\n${stack}\n\n## Тип продукта\n${(project.productType || []).join(', ') || 'Веб-приложение'}\n\n## Структура\n- Frontend (SPA)\n- Backend API (REST)\n- Database\n- CI/CD`,
-    TEAM_CONTEXT: `# Команда ${name}\n\n${team.map(t => `- **${t.label}** — ${t.personality?.name || 'TBD'} (${t.personality?.experience || 'Middle'})`).join('\n')}`,
+    PROJECT: `# ${name}\n\n${desc}\n\n## Данные проекта\n- Название: ${name}\n- Описание: ${desc}\n- Индустрия: ${project.industry || 'N/A'}\n- Стадия: ${project.stage || 'N/A'}\n- Аудитория: ${project.audience || 'N/A'}\n- Бизнес-модель: ${model}\n- Ценообразование: ${pricing}\n- Рынок: ${project.market || 'N/A'}\n- Конкуренты: ${project.competitors || 'N/A'}\n- Преимущество: ${project.advantage || 'N/A'}\n- Стек: ${stack}\n- Тип: ${(project.productType || []).join(', ') || 'Веб-приложение'}\n- MVP фичи: ${features.join(', ') || 'N/A'}\n- Таймлайн: ${timeline}\n- Бюджет: ${project.budget || 'N/A'}`,
+    ARCHITECTURE: `# Архитектура ${name}\n\n## Технологический стек\n${stack}\n\n## Тип продукта\n${(project.productType || []).join(', ') || 'Веб-приложение'}\n\n## Архитектурные компоненты\n- Frontend: SPA (${stack.split(',')[0] || 'React'})\n- Backend: REST API\n- Database: ${stack.includes('PostgreSQL') ? 'PostgreSQL' : stack.includes('MongoDB') ? 'MongoDB' : 'SQL/NoSQL'}\n- Cache: ${stack.includes('Redis') ? 'Redis' : 'In-memory'}\n- CI/CD: GitHub Actions + Docker\n- Мониторинг: Prometheus + Grafana\n\n## MVP Features\n${features.map(f => `- ${f.trim()}`).join('\n') || '- Core features'}\n\n## Non-functional требования\n- Latency: < 200ms (p99)\n- Uptime: 99.9%\n- Security: OWASP Top 10`,
+    TEAM_CONTEXT: `# Команда ${name}\n\n${team.map(t => {
+      const p = t.personality || {}
+      const pos = t.position || {}
+      return `## ${t.label} — ${p.name || 'TBD'}\n- Опыт: ${p.experience || 'Middle'}\n- Скилы: ${(p.skills || []).join(', ') || 'N/A'}\n- Бэкграунд: ${p.background || 'N/A'}\n- Функции: ${(pos.functions || []).join(', ') || 'N/A'}`
+    }).join('\n\n')}`,
+    DECISIONS: '',
+    PROGRESS: '',
+    agents: {},
   }
+
+  // Per-agent memory files
+  team.forEach(t => {
+    const agentId = t.role || t.id
+    const p = t.personality || {}
+    const pos = t.position || {}
+    memoryFiles.agents[agentId] = {
+      position: `# ${t.label} — Должностная инструкция\n\nПроект: ${name}\n\n## Функции\n${(pos.functions || []).map(f => `- ${f}`).join('\n') || '- Определяются'}\n\n## Ответственности\n${(pos.responsibilities || []).map(r => `- ${r}`).join('\n') || '- Определяются'}\n\n## Взаимодействия\n${(pos.interactions || []).map(i => `- ${i}`).join('\n') || '- С командой'}\n\n## Метрики\n${(pos.metrics || []).map(m => `- ${m}`).join('\n') || '- KPI определяются'}`,
+      personality: `# ${p.name || t.label} — Личность\n\n- Имя: ${p.name || 'N/A'}\n- Пол: ${p.gender || 'N/A'}\n- Возраст: ${p.age || 'N/A'}\n- Опыт: ${p.experience || 'Middle'}\n- Скилы: ${(p.skills || []).join(', ') || 'N/A'}\n- Бэкграунд: ${p.background || 'N/A'}\n- Темперамент: ${p.temperament || 'N/A'}\n- Стиль коммуникации: ${p.communicationStyle || 'N/A'}\n- Подход: ${p.approach || 'N/A'}`,
+      systemPrompt: t.systemPrompt || '',
+      memory: '',
+      decisions: '',
+    }
+  })
 
   return { tasks, roadmap, economics, pitchSlides, wikiPages, chatMessages, memoryFiles }
 }

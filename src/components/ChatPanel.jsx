@@ -39,7 +39,7 @@ function renderMessageText(text, team) {
 
 export default function ChatPanel() {
   const { state, dispatch } = useApp()
-  const { project, team, messages, tasks } = state
+  const { project, team, messages, tasks, memoryFiles } = state
 
   const [ch, setCh] = useState('general')
   const [inp, setInp] = useState('')
@@ -156,13 +156,15 @@ export default function ChatPanel() {
     // Show typing indicator
     setTyping({ name: agentName, role: agentRole })
 
-    // Build context for the agent
+    // Build rich context for the agent
     const context = {
-      recentMessages: channelMessages.slice(-10).map(m => ({
+      recentMessages: channelMessages.slice(-15).map(m => ({
         from: m.from === 'user' ? 'user' : 'agent',
+        name: m.name || m.from,
         text: m.text,
       })),
-      projectName: project?.name || '',
+      project: project || {},
+      memoryFiles: memoryFiles || {},
     }
 
     try {
@@ -174,8 +176,8 @@ export default function ChatPanel() {
         replyText = await chatWithAgent(agent, text, context)
       }
 
-      // Small delay for natural feel
-      await new Promise(r => setTimeout(r, 800 + Math.random() * 700))
+      // Realistic typing delay (2-3 sec)
+      await new Promise(r => setTimeout(r, 2000 + Math.random() * 1000))
 
       setTyping(null)
 

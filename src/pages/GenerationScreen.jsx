@@ -40,9 +40,9 @@ export default function GenerationScreen({ onDone }) {
               PROJECT: data.memoryFiles.PROJECT || '',
               ARCHITECTURE: data.memoryFiles.ARCHITECTURE || '',
               TEAM_CONTEXT: data.memoryFiles.TEAM_CONTEXT || '',
-              DECISIONS: '',
-              PROGRESS: '',
-              agents: {},
+              DECISIONS: data.memoryFiles.DECISIONS || '',
+              PROGRESS: data.memoryFiles.PROGRESS || '',
+              agents: data.memoryFiles.agents || {},
             },
           })
         }
