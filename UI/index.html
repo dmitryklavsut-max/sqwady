@@ -1,0 +1,851 @@
+<!DOCTYPE html><html lang="en" class="scroll-smooth"><head>
+    <script>
+        window.FontAwesomeConfig = {
+          autoReplaceSvg: 'nest'
+        };
+      </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sqwady - Build your AI Squad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: '#09090b',
+                        surface: '#141419',
+                        surfaceHighlight: '#1e1e24',
+                        primary: '#6366f1', // Indigo
+                        primaryHover: '#4f46e5',
+                        secondary: '#9b9bb0',
+                        textMain: '#f0f0f5',
+                        accentCyan: '#06b6d4',
+                        accentPink: '#ec4899',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'glow': '0 0 40px -10px rgba(99, 102, 241, 0.3)',
+                        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                        'card-hover': '0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1)',
+                    },
+                    backgroundImage: {
+                        'grid-pattern': "linear-gradient(to right, #1f1f2e 1px, transparent 1px), linear-gradient(to bottom, #1f1f2e 1px, transparent 1px)",
+                        'radial-glow': 'radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, rgba(9, 9, 11, 0) 70%)',
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.plot.ly/plotly-3.1.1.min.js"></script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #09090b;
+            color: #f0f0f5;
+        }
+        .text-gradient {
+            background: linear-gradient(to right, #6366f1, #06b6d4, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .logo-gradient {
+            background: linear-gradient(to right, #6366f1, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .grid-bg {
+            background-size: 40px 40px;
+            mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
+        }
+        .glass-card {
+            background: rgba(20, 20, 25, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #444; 
+        }
+        
+        /* Animation classes */
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+        .animate-float-delayed {
+            animation: float 6s ease-in-out 3s infinite;
+        }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden selection:bg-primary selection:text-white">
+
+    <!-- Header -->
+    <header id="header" class="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-[#09090b]/80 backdrop-blur-md transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <!-- Logo -->
+                <div class="flex-shrink-0 flex items-center gap-2 cursor-pointer">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accentCyan flex items-center justify-center text-white font-bold text-lg">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <span class="text-xl md:text-2xl font-bold tracking-tight logo-gradient">Sqwady</span>
+                </div>
+
+                <!-- Desktop Navigation -->
+                <nav class="hidden md:flex items-center gap-8">
+                    <a href="#how-it-works" class="text-sm font-medium text-secondary hover:text-white transition-colors">How it works</a>
+                    <a href="#features" class="text-sm font-medium text-secondary hover:text-white transition-colors">Features</a>
+                    <a href="#pricing" class="text-sm font-medium text-secondary hover:text-white transition-colors">Pricing</a>
+                </nav>
+
+                <!-- CTA & Mobile Menu -->
+                <div class="flex items-center gap-4">
+                    <button class="hidden md:flex items-center gap-2 text-sm font-medium text-secondary hover:text-white transition-colors">
+                        Log in
+                    </button>
+                    <button class="hidden sm:flex bg-primary hover:bg-primaryHover text-white text-sm font-medium py-2 px-4 rounded-[8px] transition-all shadow-lg shadow-primary/20 hover:shadow-primary/40">
+                        Join Waitlist
+                    </button>
+                    <!-- Mobile Hamburger -->
+                    <button id="mobile-menu-btn" class="md:hidden text-secondary hover:text-white p-2">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile Menu Dropdown -->
+        <div id="mobile-menu" class="hidden md:hidden bg-surface border-b border-white/5 absolute w-full left-0 top-full p-4 flex flex-col gap-4 shadow-2xl">
+            <a href="#how-it-works" class="text-base font-medium text-secondary hover:text-white block p-2 rounded hover:bg-white/5">How it works</a>
+            <a href="#features" class="text-base font-medium text-secondary hover:text-white block p-2 rounded hover:bg-white/5">Features</a>
+            <a href="#pricing" class="text-base font-medium text-secondary hover:text-white block p-2 rounded hover:bg-white/5">Pricing</a>
+            <div class="h-px bg-white/10 my-1"></div>
+            <button class="text-left text-base font-medium text-secondary hover:text-white block p-2 rounded hover:bg-white/5">Log in</button>
+            <button class="w-full bg-primary text-white font-medium py-3 px-4 rounded-[8px] shadow-lg">Join Waitlist</button>
+        </div>
+    </header>
+
+    <main class="relative pt-20 md:pt-24">
+        <!-- Background Elements -->
+        <div class="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-radial-glow opacity-60"></div>
+            <div class="absolute inset-0 bg-grid-pattern opacity-[0.03] grid-bg"></div>
+        </div>
+
+        <!-- Hero Section -->
+        <section id="hero" class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 md:pt-32 pb-12 md:pb-20 text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1e1e24]/80 border border-white/5 mb-10 animate-fade-in-up backdrop-blur-sm hover:bg-[#1e1e24] transition-colors cursor-default shadow-lg shadow-black/20">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-[11px] font-bold text-emerald-500 tracking-widest uppercase font-sans">Now accepting early access</span>
+            </div>
+
+            <h1 class="text-5xl md:text-7xl lg:text-[84px] font-extrabold leading-[1.1] tracking-tight mb-8 max-w-5xl mx-auto">
+                <span class="bg-clip-text text-transparent bg-gradient-to-r from-[#6366f1] via-[#06b6d4] to-[#ec4899] drop-shadow-2xl filter pb-2">Build your AI squad</span>
+            </h1>
+
+            <p class="text-lg md:text-[20px] text-secondary/80 max-w-3xl mx-auto mb-12 leading-relaxed font-light">
+                The no-code OS for AI startups. Drag desks. Seat employees. Ship products. Build the future of automation without a single line of code.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-5 mb-24 md:mb-32">
+                <button class="w-full sm:w-auto bg-[#5856D6] hover:bg-[#4b49c9] text-white text-[15px] font-semibold py-4 px-10 rounded-[12px] transition-all shadow-[0_0_30px_-5px_rgba(88,86,214,0.4)] hover:shadow-[0_0_40px_-5px_rgba(88,86,214,0.6)] hover:-translate-y-0.5 transform">
+                    Join Waitlist
+                </button>
+                <button class="w-full sm:w-auto bg-[#1C1C1E] hover:bg-[#2C2C2E] text-white border border-white/10 hover:border-white/20 text-[15px] font-medium py-4 px-8 rounded-[12px] transition-all flex items-center justify-center gap-2 group shadow-lg">
+                    See how it works
+                    <i class="fa-solid fa-circle-play text-white group-hover:scale-110 transition-transform text-lg ml-1"></i>
+                </button>
+            </div>
+
+            <div class="relative w-full max-w-6xl mx-auto">
+                <div class="relative">
+                    <h2 class="text-3xl md:text-[32px] font-bold text-white mb-3 tracking-tight">Build your dream team right now</h2>
+                    <p class="text-[15px] text-secondary/60 mb-14 font-light">Drag roles into empty slots to assemble your AI squad</p>
+
+                    <div id="dropZone" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16 px-4 md:px-0">
+    <div class="drop-slot aspect-square bg-[#0c0c10] border border-dashed border-[#2a2a36] hover:border-[#3f3f50] rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-inner shadow-black/40" data-slot="0">
+        <div class="w-[72px] h-[72px] rounded-full border border-[#2a2a36] bg-[#141419] group-hover:bg-[#1a1a20] group-hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-lg">
+            <i class="fa-solid fa-plus text-2xl text-secondary/40 group-hover:text-white transition-colors"></i>
+        </div>
+        <span class="text-[11px] font-bold text-secondary/40 uppercase tracking-[0.15em] group-hover:text-secondary/70 transition-colors">Empty Slot</span>
+    </div>
+    
+    <div class="drop-slot aspect-square bg-[#0c0c10] border border-dashed border-[#2a2a36] hover:border-[#3f3f50] rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-inner shadow-black/40" data-slot="1">
+        <div class="w-[72px] h-[72px] rounded-full border border-[#2a2a36] bg-[#141419] group-hover:bg-[#1a1a20] group-hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-lg">
+            <i class="fa-solid fa-plus text-2xl text-secondary/40 group-hover:text-white transition-colors"></i>
+        </div>
+        <span class="text-[11px] font-bold text-secondary/40 uppercase tracking-[0.15em] group-hover:text-secondary/70 transition-colors">Empty Slot</span>
+    </div>
+    
+    <div class="drop-slot filled aspect-square bg-[#0f0f16] border border-solid border-[#4f46e5]/50 rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all duration-300 shadow-[0_0_40px_-10px_rgba(79,70,229,0.15)] relative overflow-hidden group" data-slot="2" data-role="CEO" style="border-color: #6366f1; box-shadow: 0 0 40px -10px rgba(99,102,241,0.25);">
+        <div class="absolute inset-0 bg-gradient-to-b from-[#4f46e5]/10 to-transparent opacity-50"></div>
+        <div class="relative w-20 h-20 rounded-full p-1 bg-gradient-to-br from-[#4f46e5] to-[#818cf8] shadow-lg shadow-[#4f46e5]/30 mb-1">
+            <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-2.jpg" class="w-full h-full rounded-full object-cover border-2 border-[#0f0f16]" alt="CEO">
+        </div>
+        <div class="relative text-center">
+            <div class="text-[15px] font-bold text-white mb-1">Alex (CEO)</div>
+            <div class="text-[10px] font-bold text-[#6366f1] uppercase tracking-widest bg-[#6366f1]/10 px-2 py-1 rounded">Strategic AI</div>
+        </div>
+        <button class="absolute top-2 right-2 text-white/20 hover:text-white transition-colors" onclick="window.resetSlot(this.parentElement)">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+
+    <div class="drop-slot aspect-square bg-[#0c0c10] border border-dashed border-[#2a2a36] hover:border-[#3f3f50] rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-inner shadow-black/40" data-slot="3">
+        <div class="w-[72px] h-[72px] rounded-full border border-[#2a2a36] bg-[#141419] group-hover:bg-[#1a1a20] group-hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-lg">
+            <i class="fa-solid fa-plus text-2xl text-secondary/40 group-hover:text-white transition-colors"></i>
+        </div>
+        <span class="text-[11px] font-bold text-secondary/40 uppercase tracking-[0.15em] group-hover:text-secondary/70 transition-colors">Empty Slot</span>
+    </div>
+</div>
+
+                    <div class="relative bg-[#141419]/50 backdrop-blur-sm border border-white/5 rounded-3xl p-8 md:p-10">
+                        <div id="hintText" class="absolute -top-10 left-1/2 -translate-x-1/2 text-[13px] text-secondary/60 transition-opacity duration-500 bg-[#09090b] px-4 py-1 rounded-full border border-white/5">Drag roles into empty slots above</div>
+
+                        <div id="roleGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6">
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#6366f1] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)] group opacity-25 pointer-events-none grayscale" draggable="false" data-role="CEO" data-color="#6366f1" data-img="2">
+                                <div class="w-12 h-12 rounded-full bg-[#6366f1]/10 flex items-center justify-center group-hover:bg-[#6366f1] transition-colors duration-300">
+                                    <i class="fa-solid fa-star text-lg text-[#6366f1] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">CEO</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#06b6d4] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(6,182,212,0.3)] group" draggable="true" data-role="CTO" data-color="#06b6d4" data-img="3">
+                                <div class="w-12 h-12 rounded-full bg-[#06b6d4]/10 flex items-center justify-center group-hover:bg-[#06b6d4] transition-colors duration-300">
+                                    <i class="fa-solid fa-desktop text-lg text-[#06b6d4] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">CTO</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#a855f7] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(168,85,247,0.3)] group" draggable="true" data-role="Backend" data-color="#a855f7" data-img="4">
+                                <div class="w-12 h-12 rounded-full bg-[#a855f7]/10 flex items-center justify-center group-hover:bg-[#a855f7] transition-colors duration-300">
+                                    <i class="fa-solid fa-code text-lg text-[#a855f7] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">Backend</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#f59e0b] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(245,158,11,0.3)] group" draggable="true" data-role="Frontend" data-color="#f59e0b" data-img="8">
+                                <div class="w-12 h-12 rounded-full bg-[#f59e0b]/10 flex items-center justify-center group-hover:bg-[#f59e0b] transition-colors duration-300">
+                                    <i class="fa-solid fa-laptop-code text-lg text-[#f59e0b] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">Frontend</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#ef4444] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(239,68,68,0.3)] group" draggable="true" data-role="DevOps" data-color="#ef4444" data-img="9">
+                                <div class="w-12 h-12 rounded-full bg-[#ef4444]/10 flex items-center justify-center group-hover:bg-[#ef4444] transition-colors duration-300">
+                                    <i class="fa-solid fa-server text-lg text-[#ef4444] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">DevOps</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#ec4899] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(236,72,153,0.3)] group" draggable="true" data-role="Design" data-color="#ec4899" data-img="5">
+                                <div class="w-12 h-12 rounded-full bg-[#ec4899]/10 flex items-center justify-center group-hover:bg-[#ec4899] transition-colors duration-300">
+                                    <i class="fa-solid fa-pen-nib text-lg text-[#ec4899] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">Design</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#10b981] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)] group" draggable="true" data-role="Growth" data-color="#10b981" data-img="6">
+                                <div class="w-12 h-12 rounded-full bg-[#10b981]/10 flex items-center justify-center group-hover:bg-[#10b981] transition-colors duration-300">
+                                    <i class="fa-solid fa-chart-line text-lg text-[#10b981] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">Growth</span>
+                            </div>
+
+                            <div class="role-card bg-[#18181b] border border-[#27272a] hover:border-[#f97316] rounded-[16px] p-5 flex flex-col items-center justify-center gap-3 cursor-grab active:cursor-grabbing transition-all duration-200 hover:scale-105 hover:shadow-[0_0_20px_-5px_rgba(249,115,22,0.3)] group" draggable="true" data-role="PM" data-color="#f97316" data-img="7">
+                                <div class="w-12 h-12 rounded-full bg-[#f97316]/10 flex items-center justify-center group-hover:bg-[#f97316] transition-colors duration-300">
+                                    <i class="fa-solid fa-list-check text-lg text-[#f97316] group-hover:text-white transition-colors"></i>
+                                </div>
+                                <span class="text-[11px] font-bold uppercase tracking-wider text-secondary group-hover:text-white transition-colors">PM</span>
+                            </div>
+                        </div>
+
+                        <div id="createTeamBtn" class="opacity-100 transition-all duration-500 mt-8">
+                            <button class="mx-auto bg-gradient-to-r from-primary to-accentCyan text-white font-bold py-4 px-12 rounded-[12px] shadow-[0_0_30px_-5px_rgba(99,102,241,0.5)] hover:shadow-[0_0_40px_-5px_rgba(99,102,241,0.7)] transition-all hover:-translate-y-1 flex items-center gap-3 text-lg">
+                                Create Team <i class="fa-solid fa-arrow-right-long"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    const roles = document.querySelectorAll('.role-card');
+                    const slots = document.querySelectorAll('.drop-slot');
+                    const hintText = document.getElementById('hintText');
+                    const createTeamBtn = document.getElementById('createTeamBtn');
+                    let filledSlots = 1;
+
+                    roles.forEach(role => {
+                        role.addEventListener('dragstart', (e) => {
+                            if(role.classList.contains('pointer-events-none')) return;
+                            e.dataTransfer.setData('text/plain', JSON.stringify({
+                                role: role.dataset.role,
+                                color: role.dataset.color,
+                                imgId: role.dataset.img
+                            }));
+                            role.classList.add('opacity-50');
+                        });
+
+                        role.addEventListener('dragend', () => {
+                            role.classList.remove('opacity-50');
+                        });
+                    });
+
+                    slots.forEach(slot => {
+                        slot.addEventListener('dragover', (e) => {
+                            e.preventDefault();
+                            if(!slot.classList.contains('filled')) {
+                                slot.classList.add('border-primary', 'bg-primary/5', 'scale-105');
+                                slot.classList.remove('border-dashed', 'border-[#2a2a36]');
+                            }
+                        });
+
+                        slot.addEventListener('dragleave', (e) => {
+                            if(!slot.classList.contains('filled')) {
+                                slot.classList.remove('border-primary', 'bg-primary/5', 'scale-105');
+                                slot.classList.add('border-dashed', 'border-[#2a2a36]');
+                            }
+                        });
+
+                        slot.addEventListener('drop', (e) => {
+                            e.preventDefault();
+                            if (slot.classList.contains('filled')) return;
+
+                            const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                            const roleName = data.role;
+                            const roleColor = data.color;
+                            const imgId = data.imgId;
+
+                            slot.innerHTML = `
+                                <div class="absolute inset-0 bg-gradient-to-b from-[${roleColor}]/10 to-transparent opacity-50 rounded-[24px]"></div>
+                                <div class="relative w-20 h-20 rounded-full p-1 bg-gradient-to-br from-[${roleColor}] to-white/20 shadow-lg shadow-[${roleColor}]/30 mb-1 animate-fade-in-up">
+                                    <img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/avatars/avatar-${imgId}.jpg" class="w-full h-full rounded-full object-cover border-2 border-[#0f0f16]" alt="${roleName}">
+                                </div>
+                                <div class="relative text-center animate-fade-in-up">
+                                    <div class="text-[15px] font-bold text-white mb-1">Alex (${roleName})</div>
+                                    <div class="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded" style="color: ${roleColor}; background-color: ${roleColor}20;">Strategic AI</div>
+                                </div>
+                                <button class="absolute top-2 right-2 text-white/20 hover:text-white transition-colors" onclick="window.resetSlot(this.parentElement)">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            `;
+                            
+                            slot.classList.add('filled', 'border-solid');
+                            slot.classList.remove('border-dashed', 'border-[#2a2a36]', 'bg-primary/5', 'scale-105');
+                            slot.style.borderColor = roleColor;
+                            slot.style.boxShadow = `0 0 40px -10px ${roleColor}40`;
+                            slot.dataset.role = roleName;
+
+                            if(hintText) hintText.style.opacity = '0';
+                            
+                            const draggedCard = document.querySelector(`.role-card[data-role="${roleName}"]`);
+                            if(draggedCard) {
+                                draggedCard.classList.add('opacity-25', 'pointer-events-none', 'grayscale');
+                                draggedCard.setAttribute('draggable', 'false');
+                            }
+
+                            filledSlots++;
+                            checkCompletion();
+                        });
+                    });
+
+                    window.resetSlot = function(slotElement) {
+                        const roleName = slotElement.dataset.role;
+                        
+                        slotElement.innerHTML = `
+                            <div class="w-[72px] h-[72px] rounded-full border border-[#2a2a36] bg-[#141419] group-hover:bg-[#1a1a20] group-hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-lg">
+                                <i class="fa-solid fa-plus text-2xl text-secondary/40 group-hover:text-white transition-colors"></i>
+                            </div>
+                            <span class="text-[11px] font-bold text-secondary/40 uppercase tracking-[0.15em] group-hover:text-secondary/70 transition-colors">Empty Slot</span>
+                        `;
+                        
+                        slotElement.className = 'drop-slot aspect-square bg-[#0c0c10] border border-dashed border-[#2a2a36] hover:border-[#3f3f50] rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group shadow-inner shadow-black/40';
+                        slotElement.style.borderColor = '';
+                        slotElement.style.boxShadow = '';
+                        delete slotElement.dataset.role;
+                        
+                        const roleCard = document.querySelector(`.role-card[data-role="${roleName}"]`);
+                        if(roleCard) {
+                            roleCard.classList.remove('opacity-25', 'pointer-events-none', 'grayscale');
+                            roleCard.setAttribute('draggable', 'true');
+                        }
+                        
+                        filledSlots--;
+                        checkCompletion();
+                    }
+
+                    function checkCompletion() {
+                        if (filledSlots >= 2) {
+                            createTeamBtn.classList.remove('hidden');
+                            setTimeout(() => {
+                                createTeamBtn.classList.remove('opacity-0');
+                            }, 100);
+                        } else {
+                            createTeamBtn.classList.add('opacity-0');
+                            setTimeout(() => {
+                                createTeamBtn.classList.add('hidden');
+                            }, 500);
+                        }
+                    }
+                });
+            </script>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="py-24 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
+            
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4">Everything you need to <span class="text-white">scale</span></h2>
+                    <p class="text-secondary text-lg max-w-2xl mx-auto">Manage your entire AI workforce from a single, beautiful dashboard.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Feature 1 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+                            <i class="fa-solid fa-robot text-primary text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Autonomous Agents</h3>
+                        <p class="text-secondary leading-relaxed">Deploy specialized AI agents that work 24/7. They code, design, and market your product while you sleep.</p>
+                    </div>
+
+                    <!-- Feature 2 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-accentCyan/10 flex items-center justify-center mb-6 group-hover:bg-accentCyan/20 transition-colors">
+                            <i class="fa-solid fa-network-wired text-accentCyan text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Seamless Workflow</h3>
+                        <p class="text-secondary leading-relaxed">Connect agents together in complex workflows. Watch as tasks flow from PM to Design to Dev automatically.</p>
+                    </div>
+
+                    <!-- Feature 3 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-accentPink/10 flex items-center justify-center mb-6 group-hover:bg-accentPink/20 transition-colors">
+                            <i class="fa-solid fa-shield-halved text-accentPink text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Enterprise Security</h3>
+                        <p class="text-secondary leading-relaxed">Bank-grade encryption and isolated environments for each agent. Your IP stays safe and secure.</p>
+                    </div>
+
+                    <!-- Feature 4 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-yellow-500/10 flex items-center justify-center mb-6 group-hover:bg-yellow-500/20 transition-colors">
+                            <i class="fa-solid fa-bolt text-yellow-500 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Instant Scaling</h3>
+                        <p class="text-secondary leading-relaxed">Need more power? Spin up 100 new developer agents in seconds with a single click.</p>
+                    </div>
+
+                    <!-- Feature 5 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-6 group-hover:bg-green-500/20 transition-colors">
+                            <i class="fa-solid fa-plug text-green-500 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">100+ Integrations</h3>
+                        <p class="text-secondary leading-relaxed">Connects with GitHub, Slack, Jira, Figma, and all your favorite tools out of the box.</p>
+                    </div>
+
+                    <!-- Feature 6 -->
+                    <div class="bg-surface border border-white/5 hover:border-white/10 p-8 rounded-[10px] transition-all group hover:-translate-y-1">
+                        <div class="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-6 group-hover:bg-purple-500/20 transition-colors">
+                            <i class="fa-solid fa-chart-pie text-purple-500 text-xl"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold text-white mb-3">Deep Analytics</h3>
+                        <p class="text-secondary leading-relaxed">Track performance, costs, and output quality in real-time with detailed analytics dashboards.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section (Dashboard Preview) -->
+        <section class="py-20 border-y border-white/5 bg-[#0c0c10]">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col lg:flex-row items-center gap-16">
+                    <div class="lg:w-1/2">
+                        <div class="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider mb-6">Performance</div>
+                        <h2 class="text-3xl md:text-4xl font-bold mb-6 text-white">Real-time insights into your <span class="text-gradient">digital workforce</span></h2>
+                        <p class="text-secondary text-lg mb-8 leading-relaxed">
+                            Monitor every aspect of your AI squad's performance. From code quality metrics to marketing campaign ROI, get granular visibility without the micromanagement.
+                        </p>
+                        
+                        <ul class="space-y-4 mb-8">
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-check-circle text-primary mt-1"></i>
+                                <span class="text-gray-300">Live activity logs for every agent action</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-check-circle text-primary mt-1"></i>
+                                <span class="text-gray-300">Cost optimization suggestions</span>
+                            </li>
+                            <li class="flex items-start gap-3">
+                                <i class="fa-solid fa-check-circle text-primary mt-1"></i>
+                                <span class="text-gray-300">Automatic error detection and self-healing</span>
+                            </li>
+                        </ul>
+
+                        <button class="text-white border-b border-primary pb-0.5 hover:text-primary transition-colors font-medium flex items-center gap-2 group">
+                            Explore Analytics Features 
+                            <i class="fa-solid fa-arrow-right text-sm transform group-hover:translate-x-1 transition-transform"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="lg:w-1/2 w-full">
+                        <!-- Chart Card -->
+                        <div class="bg-surface border border-white/10 rounded-[14px] p-6 shadow-2xl relative">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h3 class="text-lg font-semibold text-white">Code Production</h3>
+                                    <p class="text-xs text-secondary">Last 7 days</p>
+                                </div>
+                                <div class="bg-green-500/10 text-green-400 px-2 py-1 rounded text-xs font-bold flex items-center gap-1">
+                                    <i class="fa-solid fa-arrow-trend-up"></i> +124%
+                                </div>
+                            </div>
+                            
+                            <div id="productionChart" class="w-full h-[300px] md:h-[350px]"></div>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/5">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-white">842</div>
+                                    <div class="text-xs text-secondary mt-1">Commits</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-white">12</div>
+                                    <div class="text-xs text-secondary mt-1">Products Shipped</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold text-white">99.9%</div>
+                                    <div class="text-xs text-secondary mt-1">Uptime</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Testimonials -->
+        <section class="py-24 bg-background relative">
+             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4 text-white">Loved by <span class="text-gradient">founders</span></h2>
+                    <p class="text-secondary">Join 500+ startups building with Sqwady</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Review 1 -->
+                    <div class="bg-surface p-6 rounded-[10px] border border-white/5 hover:border-white/10 transition-colors">
+                        <div class="flex items-center gap-1 text-yellow-500 mb-4 text-xs">
+                            <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                        </div>
+                        <p class="text-gray-300 mb-6 text-sm leading-relaxed">"Sqwady allowed me to launch my MVP in 3 days instead of 3 months. The Frontend agent writes better React code than I do."</p>
+                        <div class="flex items-center gap-3">
+                            <img class="w-10 h-10 rounded-full object-cover border border-white/10" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/52dbb4b6d2-1f93b110a360f930a2a4.png" alt="" sqwady="" allowed="" me="" to="" launch="" my="" mvp="" in="" 3="" days="" instead="" of="" months.="" the="" frontend="" ,="" professional="" image"="">
+                            <div>
+                                <div class="text-white text-sm font-semibold">Alex Chen</div>
+                                <div class="text-secondary text-xs">Founder, TechFlow</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review 2 -->
+                    <div class="bg-surface p-6 rounded-[10px] border border-white/5 hover:border-white/10 transition-colors">
+                        <div class="flex items-center gap-1 text-yellow-500 mb-4 text-xs">
+                            <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                        </div>
+                        <p class="text-gray-300 mb-6 text-sm leading-relaxed">"The cost savings are incredible. I replaced my entire agency spend with three specialized Sqwady agents. Game changer."</p>
+                        <div class="flex items-center gap-3">
+                            <img class="w-10 h-10 rounded-full object-cover border border-white/10" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/a12a592657-046d5b419c5821d656e6.png" alt="" the="" cost="" savings="" are="" incredible.="" i="" replaced="" my="" entire="" agency="" spend="" with="" three="" s,="" professional="" image"="">
+                            <div>
+                                <div class="text-white text-sm font-semibold">Sarah Jenkins</div>
+                                <div class="text-secondary text-xs">CEO, Bloom AI</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review 3 -->
+                    <div class="bg-surface p-6 rounded-[10px] border border-white/5 hover:border-white/10 transition-colors">
+                        <div class="flex items-center gap-1 text-yellow-500 mb-4 text-xs">
+                            <i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i><i class="fa-solid fa-star"></i>
+                        </div>
+                        <p class="text-gray-300 mb-6 text-sm leading-relaxed">"I was skeptical about AI project managers, but the coordination between the agents is seamless. It just works."</p>
+                        <div class="flex items-center gap-3">
+                            <img class="w-10 h-10 rounded-full object-cover border border-white/10" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/2113050fe7-0d1a9e5cf97eafca0a74.png" alt="" i="" was="" skeptical="" about="" ai="" project="" managers,="" but="" the="" coordination="" between="" age,="" professional="" image"="">
+                            <div>
+                                <div class="text-white text-sm font-semibold">Marcus Johnson</div>
+                                <div class="text-secondary text-xs">CTO, Nexus</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+             </div>
+        </section>
+
+        <!-- Pricing Section -->
+        <section id="pricing" class="py-24 bg-[#0c0c10]">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4 text-white">Simple, transparent <span class="text-primary">pricing</span></h2>
+                    <p class="text-secondary">Scale your AI workforce as you grow.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <!-- Starter Plan -->
+                    <div class="bg-surface border border-white/5 rounded-[10px] p-8 flex flex-col hover:border-white/20 transition-all">
+                        <h3 class="text-lg font-medium text-white mb-2">Starter</h3>
+                        <div class="text-3xl font-bold text-white mb-6">$49<span class="text-base font-normal text-secondary">/mo</span></div>
+                        <p class="text-secondary text-sm mb-8">Perfect for solo founders and side projects.</p>
+                        
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> 2 AI Agents
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Basic Workflows
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> 24h Support Turnaround
+                            </li>
+                        </ul>
+                        
+                        <button class="w-full bg-surfaceHighlight hover:bg-white/10 text-white font-medium py-3 rounded-[8px] transition-colors border border-white/10">Get Started</button>
+                    </div>
+
+                    <!-- Pro Plan -->
+                    <div class="bg-surface border border-primary rounded-[10px] p-8 flex flex-col relative shadow-lg shadow-primary/10 transform md:-translate-y-4">
+                        <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
+                        <h3 class="text-lg font-medium text-white mb-2">Growth</h3>
+                        <div class="text-3xl font-bold text-white mb-6">$199<span class="text-base font-normal text-secondary">/mo</span></div>
+                        <p class="text-secondary text-sm mb-8">For startups ready to scale operations.</p>
+                        
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm text-white">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> 10 AI Agents
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-white">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Advanced Workflows
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-white">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Priority Support
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-white">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Custom Integrations
+                            </li>
+                        </ul>
+                        
+                        <button class="w-full bg-primary hover:bg-primaryHover text-white font-medium py-3 rounded-[8px] transition-colors shadow-lg shadow-primary/25">Get Started</button>
+                    </div>
+
+                    <!-- Enterprise Plan -->
+                    <div class="bg-surface border border-white/5 rounded-[10px] p-8 flex flex-col hover:border-white/20 transition-all">
+                        <h3 class="text-lg font-medium text-white mb-2">Enterprise</h3>
+                        <div class="text-3xl font-bold text-white mb-6">Custom</div>
+                        <p class="text-secondary text-sm mb-8">For large organizations with specific needs.</p>
+                        
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Unlimited Agents
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> Dedicated Success Manager
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> SSO &amp; Advanced Security
+                            </li>
+                            <li class="flex items-center gap-3 text-sm text-gray-300">
+                                <i class="fa-solid fa-check text-primary text-xs"></i> SLA Guarantees
+                            </li>
+                        </ul>
+                        
+                        <button class="w-full bg-surfaceHighlight hover:bg-white/10 text-white font-medium py-3 rounded-[8px] transition-colors border border-white/10">Contact Sales</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section class="py-24 relative overflow-hidden">
+            <div class="absolute inset-0 bg-primary/5"></div>
+            <div class="absolute inset-0 bg-grid-pattern opacity-[0.05]"></div>
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Ready to build your <span class="text-gradient">dream team?</span></h2>
+                <p class="text-xl text-secondary mb-10 max-w-2xl mx-auto">Join thousands of founders shipping faster with Sqwady. No credit card required.</p>
+                
+                <form class="max-w-md mx-auto flex flex-col sm:flex-row gap-3">
+                    <input type="email" placeholder="Enter your email" class="flex-1 bg-surface border border-white/10 rounded-[8px] px-4 py-3.5 text-white placeholder-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all">
+                    <button type="button" class="bg-white text-background font-bold py-3.5 px-6 rounded-[8px] hover:bg-gray-100 transition-colors whitespace-nowrap">
+                        Get Early Access
+                    </button>
+                </form>
+                <p class="text-xs text-secondary mt-4">Limited spots available for the beta program.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer id="footer" class="bg-background border-t border-white/5 pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+                <div class="col-span-2 lg:col-span-2">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 rounded bg-gradient-to-br from-primary to-accentCyan flex items-center justify-center text-white text-xs">
+                            <i class="fa-solid fa-bolt"></i>
+                        </div>
+                        <span class="text-xl font-bold text-white">Sqwady</span>
+                    </div>
+                    <p class="text-secondary text-sm max-w-xs mb-6">The operating system for the next generation of AI-native startups.</p>
+                    <div class="flex gap-4">
+                        <a href="#" class="text-secondary hover:text-white transition-colors"><i class="fa-brands fa-twitter"></i></a>
+                        <a href="#" class="text-secondary hover:text-white transition-colors"><i class="fa-brands fa-github"></i></a>
+                        <a href="#" class="text-secondary hover:text-white transition-colors"><i class="fa-brands fa-discord"></i></a>
+                        <a href="#" class="text-secondary hover:text-white transition-colors"><i class="fa-brands fa-linkedin"></i></a>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Product</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Features</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Integrations</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Pricing</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Changelog</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Docs</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Company</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">About</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Blog</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Careers</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Contact</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="text-white font-semibold mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Privacy</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Terms</a></li>
+                        <li><a href="#" class="text-secondary hover:text-white transition-colors">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-white/5 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+                <p class="text-xs text-secondary">© 2024 Sqwady Inc. All rights reserved.</p>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span class="text-xs text-secondary">All systems operational</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile menu toggle
+        const btn = document.getElementById('mobile-menu-btn');
+        const menu = document.getElementById('mobile-menu');
+
+        btn.addEventListener('click', () => {
+            menu.classList.toggle('hidden');
+        });
+
+        // Chart implementation
+        window.addEventListener('load', function() {
+            try {
+                const trace1 = {
+                    x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    y: [120, 132, 101, 134, 190, 230, 210],
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Code Commits',
+                    line: {
+                        color: '#6366f1',
+                        width: 3,
+                        shape: 'spline'
+                    },
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(99, 102, 241, 0.1)'
+                };
+                
+                const trace2 = {
+                    x: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    y: [220, 182, 191, 234, 290, 330, 310],
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Tasks Completed',
+                    line: {
+                        color: '#06b6d4',
+                        width: 3,
+                        shape: 'spline'
+                    },
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(6, 182, 212, 0.1)'
+                };
+
+                const layout = {
+                    showlegend: false,
+                    margin: { t: 10, r: 10, b: 30, l: 30 },
+                    paper_bgcolor: 'rgba(0,0,0,0)',
+                    plot_bgcolor: 'rgba(0,0,0,0)',
+                    xaxis: { 
+                        showgrid: false,
+                        color: '#9b9bb0',
+                        tickfont: { family: 'Outfit, sans-serif' }
+                    },
+                    yaxis: { 
+                        showgrid: true,
+                        gridcolor: 'rgba(255,255,255,0.05)',
+                        color: '#9b9bb0',
+                        tickfont: { family: 'Outfit, sans-serif' }
+                    },
+                    hovermode: 'x unified'
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: false,
+                    displaylogo: false
+                };
+
+                Plotly.newPlot('productionChart', [trace1, trace2], layout, config);
+            } catch(e) {
+                console.error("Chart error:", e);
+                document.getElementById('productionChart').innerHTML = '<div class="flex items-center justify-center h-full text-secondary">Chart loading...</div>';
+            }
+        });
+    </script>
+
+</body></html>

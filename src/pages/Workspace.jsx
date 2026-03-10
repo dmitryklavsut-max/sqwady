@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react'
 import { WORKSPACE_TABS, DESKS } from '../data/constants'
 import { useTheme } from '../hooks/useTheme'
-import { useApp } from '../context/AppContext'
 import RoleIcon from '../components/RoleIcon'
 import ChatPanel from '../components/ChatPanel'
 import KanbanBoard from '../components/KanbanBoard'
@@ -19,19 +18,9 @@ function getInitials(name) {
 }
 
 export default function Workspace({ project, team }) {
-  const { state, dispatch } = useApp()
   const [activeTab, setActiveTab] = useState('chat')
   const [collapsed, setCollapsed] = useState(false)
   const { theme, toggle: toggleTheme } = useTheme()
-
-  const tasks = state.tasks || []
-  const setTasks = (newTasks) => {
-    if (typeof newTasks === 'function') {
-      dispatch({ type: 'SET_TASKS', payload: newTasks(tasks) })
-    } else {
-      dispatch({ type: 'SET_TASKS', payload: newTasks })
-    }
-  }
 
   const renderTab = () => {
     switch (activeTab) {
@@ -39,7 +28,7 @@ export default function Workspace({ project, team }) {
       case 'kanban': return <KanbanBoard team={team} />
       case 'road': return <RoadmapView />
       case 'econ': return <EconomicsView />
-      case 'cal': return <CalendarView team={team} tasks={tasks} />
+      case 'cal': return <CalendarView />
       case 'pitch': return <PitchStudio />
       case 'wiki': return <WikiView />
       default: return null

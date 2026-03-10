@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sqwady - Build your AI Squad</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        background: 'var(--bg)',
+                        surface: 'var(--bg2)',
+                        surfaceHighlight: 'var(--bg3)',
+                        primary: '#6366f1',
+                        primaryHover: '#4f46e5',
+                        secondary: 'var(--t2)',
+                        textMain: 'var(--t)',
+                        accentCyan: '#06b6d4',
+                        accentPink: '#ec4899',
+                    },
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'glow': '0 0 40px -10px rgba(99, 102, 241, 0.3)',
+                        'card': 'var(--card-shadow)',
+                        'card-hover': 'var(--card-shadow-hover)',
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #09090b;
+            --bg2: #141419;
+            --bg3: #1e1e24;
+            --bg4: #2a2a36;
+            --bd: #27272a;
+            --t: #f0f0f5;
+            --t2: #9b9bb0;
+            --t3: #6b6b80;
+            --ac: #6366f1;
+            --card-bg: rgba(20, 20, 25, 0.7);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+            --card-shadow-hover: 0 10px 15px -3px rgba(0,0,0,0.2), 0 4px 6px -2px rgba(0,0,0,0.1);
+            --nav-bg: rgba(9,9,11,0.8);
+        }
+
+        [data-theme="light"] {
+            --bg: #f8f9fb;
+            --bg2: #ffffff;
+            --bg3: #f1f3f5;
+            --bg4: #e9ecef;
+            --bd: #dee2e6;
+            --t: #1a1a2e;
+            --t2: #495057;
+            --t3: #868e96;
+            --ac: #6366f1;
+            --card-bg: rgba(255, 255, 255, 0.8);
+            --card-border: rgba(0, 0, 0, 0.06);
+            --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --card-shadow-hover: 0 10px 15px -3px rgba(0,0,0,0.08);
+            --nav-bg: rgba(255,255,255,0.85);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg);
+            color: var(--t);
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        .text-gradient {
+            background: linear-gradient(to right, #6366f1, #06b6d4, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .logo-gradient {
+            background: linear-gradient(to right, #6366f1, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(99, 102, 241, 0.2);
+            box-shadow: 0 0 40px -10px rgba(99, 102, 241, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .grid-bg {
+            background-image: linear-gradient(to right, #1f1f2e 1px, transparent 1px),
+                              linear-gradient(to bottom, #1f1f2e 1px, transparent 1px);
+            background-size: 40px 40px;
+            mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
+            -webkit-mask-image: linear-gradient(to bottom, transparent, 10%, black, 90%, transparent);
+        }
+
+        [data-theme="light"] .grid-bg {
+            background-image: linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+                              linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+        }
+
+        .radial-glow {
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+        }
+
+        [data-theme="light"] .radial-glow {
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.08) 0%, transparent 70%);
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 4px; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: none; }
+        }
+
+        .animate-fade-up {
+            animation: fadeUp 0.5s ease both;
+        }
+
+        /* Drag and drop */
+        .role-card { cursor: grab; }
+        .role-card:active { cursor: grabbing; }
+        .role-card.used { opacity: 0.25; pointer-events: none; filter: grayscale(1); }
+    </style>
+</head>
+<body class="antialiased overflow-x-hidden selection:bg-primary selection:text-white">
+
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 border-b border-[var(--card-border)]" style="background: var(--nav-bg); backdrop-filter: blur(12px);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16 md:h-20">
+                <div class="flex items-center gap-2 cursor-pointer">
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-[#6366f1] to-[#06b6d4] flex items-center justify-center text-white font-bold text-lg">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <span class="text-xl md:text-2xl font-bold tracking-tight logo-gradient">Sqwady</span>
+                </div>
+
+                <nav class="hidden md:flex items-center gap-8">
+                    <a href="#how-it-works" class="text-sm font-medium" style="color: var(--t2);" onmouseover="this.style.color='var(--t)'" onmouseout="this.style.color='var(--t2)'">How it works</a>
+                    <a href="#features" class="text-sm font-medium" style="color: var(--t2);" onmouseover="this.style.color='var(--t)'" onmouseout="this.style.color='var(--t2)'">Features</a>
+                    <a href="#pricing" class="text-sm font-medium" style="color: var(--t2);" onmouseover="this.style.color='var(--t)'" onmouseout="this.style.color='var(--t2)'">Pricing</a>
+                </nav>
+
+                <div class="flex items-center gap-3">
+                    <button id="theme-toggle" class="p-2 rounded-lg transition-colors" style="color: var(--t3);" aria-label="Toggle theme">
+                        <i class="fa-solid fa-sun" id="theme-icon"></i>
+                    </button>
+                    <button class="hidden sm:flex bg-[#6366f1] hover:bg-[#4f46e5] text-white text-sm font-medium py-2 px-4 rounded-lg transition-all" style="box-shadow: 0 0 20px -5px rgba(99,102,241,0.4);">
+                        Join Waitlist
+                    </button>
+                    <button id="mobile-menu-btn" class="md:hidden p-2" style="color: var(--t2);">
+                        <i class="fa-solid fa-bars text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mobile-menu" class="hidden md:hidden border-b border-[var(--card-border)] p-4 flex flex-col gap-3" style="background: var(--bg2);">
+            <a href="#how-it-works" class="text-base font-medium p-2 rounded-lg" style="color: var(--t2);">How it works</a>
+            <a href="#features" class="text-base font-medium p-2 rounded-lg" style="color: var(--t2);">Features</a>
+            <a href="#pricing" class="text-base font-medium p-2 rounded-lg" style="color: var(--t2);">Pricing</a>
+            <div class="h-px" style="background: var(--bd);"></div>
+            <button class="w-full bg-[#6366f1] text-white font-medium py-3 px-4 rounded-lg">Join Waitlist</button>
+        </div>
+    </header>
+
+    <main class="relative pt-20 md:pt-24">
+        <!-- Background -->
+        <div class="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[600px] radial-glow opacity-60"></div>
+            <div class="absolute inset-0 grid-bg opacity-[0.03]"></div>
+        </div>
+
+        <!-- Hero -->
+        <section class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 md:pt-32 pb-12 md:pb-20 text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-[var(--card-border)] mb-10 animate-fade-up" style="background: var(--bg3); backdrop-filter: blur(8px);">
+                <span class="relative flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+                <span class="text-[11px] font-bold text-emerald-500 tracking-widest uppercase">Now accepting early access</span>
+            </div>
+
+            <h1 class="text-5xl md:text-7xl lg:text-[84px] font-extrabold leading-[1.1] tracking-tight mb-8 max-w-5xl mx-auto animate-fade-up" style="animation-delay: 0.1s;">
+                <span class="text-gradient">Build your AI squad</span>
+            </h1>
+
+            <p class="text-lg md:text-xl max-w-3xl mx-auto mb-12 leading-relaxed font-light animate-fade-up" style="color: var(--t2); animation-delay: 0.2s;">
+                The no-code OS for AI startups. Drag desks. Seat employees. Ship products. Build the future of automation without a single line of code.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-5 mb-24 md:mb-32 animate-fade-up" style="animation-delay: 0.3s;">
+                <button class="w-full sm:w-auto bg-[#5856D6] hover:bg-[#4b49c9] text-white text-[15px] font-semibold py-4 px-10 rounded-xl transition-all hover:-translate-y-0.5 transform" style="box-shadow: 0 0 30px -5px rgba(88,86,214,0.4);">
+                    Join Waitlist
+                </button>
+                <button class="w-full sm:w-auto border border-[var(--card-border)] text-[15px] font-medium py-4 px-8 rounded-xl transition-all flex items-center justify-center gap-2 group" style="background: var(--bg2); color: var(--t); box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    See how it works
+                    <i class="fa-solid fa-circle-play text-lg ml-1 group-hover:scale-110 transition-transform"></i>
+                </button>
+            </div>
+
+            <!-- Team Builder Demo -->
+            <div class="relative w-full max-w-6xl mx-auto">
+                <h2 class="text-3xl md:text-[32px] font-bold mb-3 tracking-tight" style="color: var(--t);">Build your dream team right now</h2>
+                <p class="text-[15px] mb-14 font-light" style="color: var(--t3);">Drag roles into empty slots to assemble your AI squad</p>
+
+                <div id="dropZone" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16 px-4 md:px-0">
+                    <div class="drop-slot aspect-square border border-dashed rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group" style="background: #0c0c10; border-color: var(--bd);" data-slot="0">
+                        <div class="w-[72px] h-[72px] rounded-full border flex items-center justify-center group-hover:scale-110 transition-all duration-300" style="border-color: var(--bd); background: var(--bg2);">
+                            <i class="fa-solid fa-plus text-2xl" style="color: var(--t3);"></i>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.15em]" style="color: var(--t3);">Empty Slot</span>
+                    </div>
+                    <div class="drop-slot aspect-square border border-dashed rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group" style="background: #0c0c10; border-color: var(--bd);" data-slot="1">
+                        <div class="w-[72px] h-[72px] rounded-full border flex items-center justify-center group-hover:scale-110 transition-all duration-300" style="border-color: var(--bd); background: var(--bg2);">
+                            <i class="fa-solid fa-plus text-2xl" style="color: var(--t3);"></i>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.15em]" style="color: var(--t3);">Empty Slot</span>
+                    </div>
+                    <div class="drop-slot aspect-square border border-dashed rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group" style="background: #0c0c10; border-color: var(--bd);" data-slot="2">
+                        <div class="w-[72px] h-[72px] rounded-full border flex items-center justify-center group-hover:scale-110 transition-all duration-300" style="border-color: var(--bd); background: var(--bg2);">
+                            <i class="fa-solid fa-plus text-2xl" style="color: var(--t3);"></i>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.15em]" style="color: var(--t3);">Empty Slot</span>
+                    </div>
+                    <div class="drop-slot aspect-square border border-dashed rounded-[24px] flex flex-col items-center justify-center gap-4 transition-all duration-300 group" style="background: #0c0c10; border-color: var(--bd);" data-slot="3">
+                        <div class="w-[72px] h-[72px] rounded-full border flex items-center justify-center group-hover:scale-110 transition-all duration-300" style="border-color: var(--bd); background: var(--bg2);">
+                            <i class="fa-solid fa-plus text-2xl" style="color: var(--t3);"></i>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-[0.15em]" style="color: var(--t3);">Empty Slot</span>
+                    </div>
+                </div>
+
+                <div class="relative glass-card p-8 md:p-10">
+                    <div id="hintText" class="absolute -top-10 left-1/2 -translate-x-1/2 text-[13px] transition-opacity duration-500 px-4 py-1 rounded-full border border-[var(--card-border)]" style="color: var(--t3); background: var(--bg);">Drag roles into empty slots above</div>
+
+                    <div id="roleGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6">
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="CEO" data-color="#6366f1" data-icon="fa-star" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#6366f1'; this.style.boxShadow='0 0 20px -5px rgba(99,102,241,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(99,102,241,0.1);"><i class="fa-solid fa-star text-lg" style="color: #6366f1;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">CEO</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="CTO" data-color="#06b6d4" data-icon="fa-desktop" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#06b6d4'; this.style.boxShadow='0 0 20px -5px rgba(6,182,212,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(6,182,212,0.1);"><i class="fa-solid fa-desktop text-lg" style="color: #06b6d4;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">CTO</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="Backend" data-color="#a855f7" data-icon="fa-code" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#a855f7'; this.style.boxShadow='0 0 20px -5px rgba(168,85,247,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(168,85,247,0.1);"><i class="fa-solid fa-code text-lg" style="color: #a855f7;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">Backend</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="Frontend" data-color="#f59e0b" data-icon="fa-laptop-code" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#f59e0b'; this.style.boxShadow='0 0 20px -5px rgba(245,158,11,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(245,158,11,0.1);"><i class="fa-solid fa-laptop-code text-lg" style="color: #f59e0b;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">Frontend</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="DevOps" data-color="#ef4444" data-icon="fa-server" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#ef4444'; this.style.boxShadow='0 0 20px -5px rgba(239,68,68,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(239,68,68,0.1);"><i class="fa-solid fa-server text-lg" style="color: #ef4444;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">DevOps</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="Design" data-color="#ec4899" data-icon="fa-pen-nib" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#ec4899'; this.style.boxShadow='0 0 20px -5px rgba(236,72,153,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(236,72,153,0.1);"><i class="fa-solid fa-pen-nib text-lg" style="color: #ec4899;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">Design</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="Growth" data-color="#10b981" data-icon="fa-chart-line" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#10b981'; this.style.boxShadow='0 0 20px -5px rgba(16,185,129,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(16,185,129,0.1);"><i class="fa-solid fa-chart-line text-lg" style="color: #10b981;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">Growth</span>
+                        </div>
+                        <div class="role-card border rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all duration-200 hover:scale-105 group" draggable="true" data-role="PM" data-color="#f97316" data-icon="fa-list-check" style="background: var(--bg2); border-color: var(--bd);" onmouseover="this.style.borderColor='#f97316'; this.style.boxShadow='0 0 20px -5px rgba(249,115,22,0.3)';" onmouseout="if(!this.classList.contains('used')){this.style.borderColor='var(--bd)'; this.style.boxShadow='none';}">
+                            <div class="w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300" style="background: rgba(249,115,22,0.1);"><i class="fa-solid fa-list-check text-lg" style="color: #f97316;"></i></div>
+                            <span class="text-[11px] font-bold uppercase tracking-wider" style="color: var(--t2);">PM</span>
+                        </div>
+                    </div>
+
+                    <div id="createTeamBtn" class="opacity-0 pointer-events-none transition-all duration-500 mt-8">
+                        <button class="mx-auto bg-gradient-to-r from-[#6366f1] to-[#06b6d4] text-white font-bold py-4 px-12 rounded-xl transition-all hover:-translate-y-1 flex items-center gap-3 text-lg" style="box-shadow: 0 0 30px -5px rgba(99,102,241,0.5);">
+                            Create Team <i class="fa-solid fa-arrow-right-long"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How it works -->
+        <section id="how-it-works" class="relative z-10 py-24">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--t);">How it <span class="text-gradient">works</span></h2>
+                    <p class="text-lg max-w-2xl mx-auto" style="color: var(--t2);">Three simple steps to launch your AI-powered startup.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                    <div class="glass-card p-8 text-center">
+                        <div class="text-5xl font-black text-gradient mb-4 opacity-30">01</div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Drag roles</h3>
+                        <p style="color: var(--t2);">Choose from 12 specialized AI agent roles for your team.</p>
+                    </div>
+                    <div class="glass-card p-8 text-center">
+                        <div class="text-5xl font-black text-gradient mb-4 opacity-30">02</div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Configure agents</h3>
+                        <p style="color: var(--t2);">Set LLM model, memory, personality for each team member.</p>
+                    </div>
+                    <div class="glass-card p-8 text-center">
+                        <div class="text-5xl font-black text-gradient mb-4 opacity-30">03</div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Launch & ship</h3>
+                        <p style="color: var(--t2);">Your AI squad starts collaborating immediately. Ship products faster.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features -->
+        <section id="features" class="py-24 relative overflow-hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--t);">Everything you need to <span style="color: var(--t);">scale</span></h2>
+                    <p class="text-lg max-w-2xl mx-auto" style="color: var(--t2);">Manage your entire AI workforce from a single, beautiful dashboard.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(99,102,241,0.1);"><i class="fa-solid fa-robot text-xl" style="color: #6366f1;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Autonomous Agents</h3>
+                        <p style="color: var(--t2);">Deploy specialized AI agents that work 24/7. They code, design, and market your product while you sleep.</p>
+                    </div>
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(6,182,212,0.1);"><i class="fa-solid fa-network-wired text-xl" style="color: #06b6d4;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Seamless Workflow</h3>
+                        <p style="color: var(--t2);">Connect agents together in complex workflows. Watch as tasks flow from PM to Design to Dev automatically.</p>
+                    </div>
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(236,72,153,0.1);"><i class="fa-solid fa-shield-halved text-xl" style="color: #ec4899;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Enterprise Security</h3>
+                        <p style="color: var(--t2);">Bank-grade encryption and isolated environments for each agent. Your IP stays safe and secure.</p>
+                    </div>
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(245,158,11,0.1);"><i class="fa-solid fa-bolt text-xl" style="color: #f59e0b;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Instant Scaling</h3>
+                        <p style="color: var(--t2);">Need more power? Spin up 100 new developer agents in seconds with a single click.</p>
+                    </div>
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(16,185,129,0.1);"><i class="fa-solid fa-plug text-xl" style="color: #10b981;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">100+ Integrations</h3>
+                        <p style="color: var(--t2);">Connects with GitHub, Slack, Jira, Figma, and all your favorite tools out of the box.</p>
+                    </div>
+                    <div class="glass-card p-8 group">
+                        <div class="w-12 h-12 rounded-xl flex items-center justify-center mb-6" style="background: rgba(168,85,247,0.1);"><i class="fa-solid fa-chart-pie text-xl" style="color: #a855f7;"></i></div>
+                        <h3 class="text-xl font-semibold mb-3" style="color: var(--t);">Deep Analytics</h3>
+                        <p style="color: var(--t2);">Track performance, costs, and output quality in real-time with detailed analytics dashboards.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pricing -->
+        <section id="pricing" class="py-24" style="background: var(--bg2);">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="text-center mb-16">
+                    <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color: var(--t);">Simple, transparent <span style="color: #6366f1;">pricing</span></h2>
+                    <p style="color: var(--t2);">Scale your AI workforce as you grow.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                    <!-- Starter -->
+                    <div class="flex flex-col p-8 rounded-2xl border transition-all" style="background: var(--bg2); border-color: var(--card-border);">
+                        <h3 class="text-lg font-medium mb-2" style="color: var(--t);">Starter</h3>
+                        <div class="text-3xl font-bold mb-6" style="color: var(--t);">$49<span class="text-base font-normal" style="color: var(--t2);">/mo</span></div>
+                        <p class="text-sm mb-8" style="color: var(--t2);">Perfect for solo founders and side projects.</p>
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> 2 AI Agents</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Basic Workflows</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> 24h Support Turnaround</li>
+                        </ul>
+                        <button class="w-full font-medium py-3 rounded-lg border transition-colors" style="background: var(--bg3); color: var(--t); border-color: var(--card-border);">Get Started</button>
+                    </div>
+                    <!-- Growth (highlighted) -->
+                    <div class="flex flex-col p-8 rounded-2xl border border-[#6366f1] relative md:-translate-y-4 transition-all" style="background: var(--bg2); box-shadow: 0 0 40px -10px rgba(99,102,241,0.2);">
+                        <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#6366f1] text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">Most Popular</div>
+                        <h3 class="text-lg font-medium mb-2" style="color: var(--t);">Growth</h3>
+                        <div class="text-3xl font-bold mb-6" style="color: var(--t);">$199<span class="text-base font-normal" style="color: var(--t2);">/mo</span></div>
+                        <p class="text-sm mb-8" style="color: var(--t2);">For startups ready to scale operations.</p>
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> 10 AI Agents</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Advanced Workflows</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Priority Support</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Custom Integrations</li>
+                        </ul>
+                        <button class="w-full bg-[#6366f1] hover:bg-[#4f46e5] text-white font-medium py-3 rounded-lg transition-colors" style="box-shadow: 0 0 20px -5px rgba(99,102,241,0.4);">Get Started</button>
+                    </div>
+                    <!-- Enterprise -->
+                    <div class="flex flex-col p-8 rounded-2xl border transition-all" style="background: var(--bg2); border-color: var(--card-border);">
+                        <h3 class="text-lg font-medium mb-2" style="color: var(--t);">Enterprise</h3>
+                        <div class="text-3xl font-bold mb-6" style="color: var(--t);">Custom</div>
+                        <p class="text-sm mb-8" style="color: var(--t2);">For large organizations with specific needs.</p>
+                        <ul class="space-y-4 mb-8 flex-1">
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Unlimited Agents</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> Dedicated Success Manager</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> SSO & Advanced Security</li>
+                            <li class="flex items-center gap-3 text-sm" style="color: var(--t2);"><i class="fa-solid fa-check text-xs" style="color: #6366f1;"></i> SLA Guarantees</li>
+                        </ul>
+                        <button class="w-full font-medium py-3 rounded-lg border transition-colors" style="background: var(--bg3); color: var(--t); border-color: var(--card-border);">Contact Sales</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA / Waitlist -->
+        <section class="py-24 relative overflow-hidden">
+            <div class="absolute inset-0" style="background: rgba(99,102,241,0.03);"></div>
+            <div class="absolute inset-0 grid-bg opacity-[0.05]"></div>
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
+                <h2 class="text-4xl md:text-5xl font-bold mb-6" style="color: var(--t);">Ready to build your <span class="text-gradient">dream team?</span></h2>
+                <p class="text-xl mb-10 max-w-2xl mx-auto" style="color: var(--t2);">Join thousands of founders shipping faster with Sqwady. No credit card required.</p>
+                <form class="max-w-md mx-auto flex flex-col sm:flex-row gap-3" onsubmit="return false;">
+                    <input type="email" placeholder="Enter your email" class="flex-1 border rounded-lg px-4 py-3.5 transition-all focus:outline-none" style="background: var(--bg2); border-color: var(--card-border); color: var(--t);">
+                    <button type="submit" class="font-bold py-3.5 px-6 rounded-lg transition-opacity hover:opacity-90 whitespace-nowrap" style="background: var(--t); color: var(--bg);">
+                        Get Early Access
+                    </button>
+                </form>
+                <p class="text-xs mt-4" style="color: var(--t3);">Limited spots available for the beta program.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t pt-16 pb-8" style="background: var(--bg); border-color: var(--card-border);">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+                <div class="col-span-2">
+                    <div class="flex items-center gap-2 mb-4">
+                        <div class="w-6 h-6 rounded bg-gradient-to-br from-[#6366f1] to-[#06b6d4] flex items-center justify-center text-white text-xs"><i class="fa-solid fa-bolt"></i></div>
+                        <span class="text-xl font-bold" style="color: var(--t);">Sqwady</span>
+                    </div>
+                    <p class="text-sm max-w-xs mb-6" style="color: var(--t2);">The operating system for the next generation of AI-native startups.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4" style="color: var(--t);">Product</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" style="color: var(--t2);">Features</a></li>
+                        <li><a href="#" style="color: var(--t2);">Integrations</a></li>
+                        <li><a href="#" style="color: var(--t2);">Pricing</a></li>
+                        <li><a href="#" style="color: var(--t2);">Changelog</a></li>
+                        <li><a href="#" style="color: var(--t2);">Docs</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4" style="color: var(--t);">Company</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" style="color: var(--t2);">About</a></li>
+                        <li><a href="#" style="color: var(--t2);">Blog</a></li>
+                        <li><a href="#" style="color: var(--t2);">Careers</a></li>
+                        <li><a href="#" style="color: var(--t2);">Contact</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold mb-4" style="color: var(--t);">Legal</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#" style="color: var(--t2);">Privacy</a></li>
+                        <li><a href="#" style="color: var(--t2);">Terms</a></li>
+                        <li><a href="#" style="color: var(--t2);">Security</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t pt-8 flex flex-col md:flex-row justify-between items-center gap-4" style="border-color: var(--card-border);">
+                <p class="text-xs" style="color: var(--t3);">&copy; 2025 Sqwady Inc. All rights reserved.</p>
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span class="text-xs" style="color: var(--t3);">All systems operational</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Theme toggle
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        let currentTheme = localStorage.getItem('sqwady-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        updateIcon();
+
+        themeToggle.addEventListener('click', () => {
+            currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            localStorage.setItem('sqwady-theme', currentTheme);
+            updateIcon();
+        });
+
+        function updateIcon() {
+            themeIcon.className = currentTheme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+        }
+
+        // Mobile menu
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        });
+
+        // Drag and drop
+        document.addEventListener('DOMContentLoaded', () => {
+            const roles = document.querySelectorAll('.role-card');
+            const slots = document.querySelectorAll('.drop-slot');
+            const hintText = document.getElementById('hintText');
+            const createTeamBtn = document.getElementById('createTeamBtn');
+            let filledSlots = 0;
+
+            roles.forEach(role => {
+                role.addEventListener('dragstart', (e) => {
+                    if (role.classList.contains('used')) return;
+                    e.dataTransfer.setData('text/plain', JSON.stringify({
+                        role: role.dataset.role,
+                        color: role.dataset.color,
+                        icon: role.dataset.icon
+                    }));
+                    role.style.opacity = '0.5';
+                });
+                role.addEventListener('dragend', () => {
+                    role.style.opacity = '';
+                });
+            });
+
+            slots.forEach(slot => {
+                slot.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    if (!slot.classList.contains('filled')) {
+                        slot.style.borderColor = '#6366f1';
+                        slot.style.borderStyle = 'solid';
+                        slot.style.transform = 'scale(1.03)';
+                    }
+                });
+                slot.addEventListener('dragleave', () => {
+                    if (!slot.classList.contains('filled')) {
+                        slot.style.borderColor = 'var(--bd)';
+                        slot.style.borderStyle = 'dashed';
+                        slot.style.transform = '';
+                    }
+                });
+                slot.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (slot.classList.contains('filled')) return;
+                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+
+                    slot.innerHTML = `
+                        <div style="position:absolute;inset:0;background:linear-gradient(to bottom,${data.color}15,transparent);border-radius:24px;"></div>
+                        <div style="width:80px;height:80px;border-radius:50%;padding:3px;background:linear-gradient(135deg,${data.color},${data.color}80);box-shadow:0 8px 20px ${data.color}40;">
+                            <div style="width:100%;height:100%;border-radius:50%;background:var(--bg);display:flex;align-items:center;justify-content:center;">
+                                <i class="fa-solid ${data.icon} text-3xl" style="color:${data.color};"></i>
+                            </div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:15px;font-weight:700;color:var(--t);margin-bottom:4px;">${data.role}</div>
+                            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:${data.color};background:${data.color}15;padding:2px 8px;border-radius:4px;">AI Agent</div>
+                        </div>
+                        <button onclick="window.resetSlot(this.parentElement, '${data.role}')" style="position:absolute;top:8px;right:8px;color:var(--t3);cursor:pointer;background:none;border:none;font-size:14px;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    `;
+                    slot.classList.add('filled');
+                    slot.style.borderColor = data.color;
+                    slot.style.borderStyle = 'solid';
+                    slot.style.boxShadow = `0 0 40px -10px ${data.color}40`;
+                    slot.style.transform = '';
+                    slot.dataset.role = data.role;
+
+                    const draggedCard = document.querySelector(`.role-card[data-role="${data.role}"]`);
+                    if (draggedCard) draggedCard.classList.add('used');
+
+                    if (hintText) hintText.style.opacity = '0';
+                    filledSlots++;
+                    checkCompletion();
+                });
+            });
+
+            window.resetSlot = function(el, roleName) {
+                el.innerHTML = `
+                    <div class="w-[72px] h-[72px] rounded-full border flex items-center justify-center group-hover:scale-110 transition-all duration-300" style="border-color: var(--bd); background: var(--bg2);">
+                        <i class="fa-solid fa-plus text-2xl" style="color: var(--t3);"></i>
+                    </div>
+                    <span class="text-[11px] font-bold uppercase tracking-[0.15em]" style="color: var(--t3);">Empty Slot</span>
+                `;
+                el.classList.remove('filled');
+                el.style.borderColor = 'var(--bd)';
+                el.style.borderStyle = 'dashed';
+                el.style.boxShadow = '';
+                delete el.dataset.role;
+
+                const roleCard = document.querySelector(`.role-card[data-role="${roleName}"]`);
+                if (roleCard) roleCard.classList.remove('used');
+
+                filledSlots--;
+                checkCompletion();
+            };
+
+            function checkCompletion() {
+                if (filledSlots >= 2) {
+                    createTeamBtn.classList.remove('pointer-events-none');
+                    createTeamBtn.style.opacity = '1';
+                } else {
+                    createTeamBtn.classList.add('pointer-events-none');
+                    createTeamBtn.style.opacity = '0';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
