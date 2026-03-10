@@ -36,7 +36,7 @@ export default function Workspace({ project, team }) {
   const renderTab = () => {
     switch (activeTab) {
       case 'chat': return <ChatPanel />
-      case 'kanban': return <KanbanBoard team={team} tasks={tasks} onSetTasks={setTasks} />
+      case 'kanban': return <KanbanBoard team={team} />
       case 'road': return <RoadmapView />
       case 'econ': return <EconomicsView />
       case 'cal': return <CalendarView team={team} tasks={tasks} />
