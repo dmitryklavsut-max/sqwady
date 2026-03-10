@@ -1,6 +1,10 @@
 import { createContext, useContext, useReducer, useEffect } from 'react'
 
 const STORAGE_KEY = 'sqwady-state'
+const PROJECTS_KEY = 'sqwady-projects'
+const TEAMS_KEY = 'sqwady-teams'
+const AGENTS_KEY = 'sqwady-agents'
+const CURRENT_KEY = 'sqwady-current'
 
 const initialState = {
   project: null,
@@ -97,6 +101,8 @@ function reducer(state, action) {
       }
     case 'SET_RECOMMENDATIONS':
       return { ...state, recommendations: action.payload }
+    case 'LOAD_PROJECT_STATE':
+      return { ...initialState, ...action.payload }
     case 'RESET':
       return initialState
     default:
@@ -124,4 +130,132 @@ export function useApp() {
   const ctx = useContext(AppContext)
   if (!ctx) throw new Error('useApp must be used within AppProvider')
   return ctx
+}
+
+// ── Project management utilities ──────────────────────
+
+function readJSON(key) {
+  try {
+    const raw = localStorage.getItem(key)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function writeJSON(key, data) {
+  localStorage.setItem(key, JSON.stringify(data))
+}
+
+export function listProjects() {
+  const projects = readJSON(PROJECTS_KEY) || []
+  return projects.map(({ id, name, industry, stage, updatedAt, state }) => {
+    const taskStats = {
+      total: state?.tasks?.length || 0,
+      done: state?.tasks?.filter(t => t.column === 'done').length || 0,
+    }
+    return { id, name, industry, stage, updatedAt, taskStats, teamSize: state?.team?.length || 0 }
+  })
+}
+
+export function saveCurrentProject(state) {
+  if (!state.project) return null
+  const projects = readJSON(PROJECTS_KEY) || []
+  const current = readJSON(CURRENT_KEY)
+  const id = current?.projectId || crypto.randomUUID()
+  const entry = {
+    id,
+    name: state.project.name || 'Без названия',
+    industry: state.project.industry || '',
+    stage: state.project.stage || '',
+    updatedAt: new Date().toISOString(),
+    state,
+  }
+  const idx = projects.findIndex(p => p.id === id)
+  if (idx >= 0) {
+    projects[idx] = entry
+  } else {
+    projects.push(entry)
+  }
+  writeJSON(PROJECTS_KEY, projects)
+  writeJSON(CURRENT_KEY, { projectId: id })
+  return id
+}
+
+export function loadProject(projectId) {
+  const projects = readJSON(PROJECTS_KEY) || []
+  const found = projects.find(p => p.id === projectId)
+  if (!found) return null
+  writeJSON(CURRENT_KEY, { projectId })
+  return found.state
+}
+
+export function deleteProject(projectId) {
+  const projects = readJSON(PROJECTS_KEY) || []
+  writeJSON(PROJECTS_KEY, projects.filter(p => p.id !== projectId))
+  const current = readJSON(CURRENT_KEY)
+  if (current?.projectId === projectId) {
+    localStorage.removeItem(CURRENT_KEY)
+  }
+}
+
+export function getCurrentProjectId() {
+  return readJSON(CURRENT_KEY)?.projectId || null
+}
+
+// ── Team templates ────────────────────────────────────
+
+export function listTeamTemplates() {
+  return readJSON(TEAMS_KEY) || []
+}
+
+export function saveTeamTemplate(team, name, description) {
+  const templates = readJSON(TEAMS_KEY) || []
+  const entry = {
+    id: crypto.randomUUID(),
+    name,
+    description,
+    roles: team.map(({ id, role, label, color, position, personality, model, temperature }) => ({
+      id, role, label, color, position, personality, model, temperature,
+    })),
+    createdAt: new Date().toISOString(),
+  }
+  templates.push(entry)
+  writeJSON(TEAMS_KEY, templates)
+  return entry
+}
+
+export function deleteTeamTemplate(id) {
+  const templates = readJSON(TEAMS_KEY) || []
+  writeJSON(TEAMS_KEY, templates.filter(t => t.id !== id))
+}
+
+// ── Agent configs ─────────────────────────────────────
+
+export function listAgentConfigs() {
+  return readJSON(AGENTS_KEY) || []
+}
+
+export function saveAgentConfig(agent) {
+  const configs = readJSON(AGENTS_KEY) || []
+  const entry = {
+    id: crypto.randomUUID(),
+    name: agent.personality?.name || agent.label || 'Agent',
+    role: agent.role || agent.id,
+    label: agent.label,
+    color: agent.color,
+    personality: agent.personality,
+    position: agent.position,
+    model: agent.model,
+    temperature: agent.temperature,
+    createdAt: new Date().toISOString(),
+  }
+  configs.push(entry)
+  writeJSON(AGENTS_KEY, configs)
+  return entry
+}
+
+export function deleteAgentConfig(id) {
+  const configs = readJSON(AGENTS_KEY) || []
+  writeJSON(AGENTS_KEY, configs.filter(a => a.id !== id))
 }

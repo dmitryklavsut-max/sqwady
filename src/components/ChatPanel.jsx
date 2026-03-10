@@ -246,9 +246,10 @@ export default function ChatPanel() {
                   </div>
                   <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
                 </div>
-                <span className="text-[13px] font-medium text-[var(--t)] truncate">
-                  {name}
-                </span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-[var(--t)] truncate">{name}</div>
+                  <div className="text-[11px] text-[var(--t3)] truncate">{desk?.label}</div>
+                </div>
               </div>
             )
           })}
@@ -305,6 +306,9 @@ export default function ChatPanel() {
                     <span className="font-bold text-sm" style={{ color }}>
                       {displayName}
                     </span>
+                    {!isUser && desk && (
+                      <span className="text-[12px] text-[var(--t3)]"> · {desk.label}</span>
+                    )}
                     <span className="text-xs text-[var(--t3)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
                       {m.time}
                     </span>
@@ -344,7 +348,7 @@ export default function ChatPanel() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-sm text-[var(--t3)] italic">
-                <span>{typing.name} печатает</span>
+                <span>{typing.name} ({getDeskForRole(typing.role)?.label || typing.role}) печатает</span>
                 <span className="flex gap-0.5">
                   <span className="w-1 h-1 rounded-full bg-[var(--t3)] animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-1 h-1 rounded-full bg-[var(--t3)] animate-bounce" style={{ animationDelay: '150ms' }} />

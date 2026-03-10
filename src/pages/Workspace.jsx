@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sun, Moon, FolderOpen } from 'lucide-react'
 import { WORKSPACE_TABS, DESKS } from '../data/constants'
 import { useTheme } from '../hooks/useTheme'
+import { useApp } from '../context/AppContext'
 import RoleIcon from '../components/RoleIcon'
+import AgentConfigModal from '../components/AgentConfigModal'
 import ChatPanel from '../components/ChatPanel'
 import KanbanBoard from '../components/KanbanBoard'
 import RoadmapView from '../components/RoadmapView'
@@ -17,9 +19,11 @@ function getInitials(name) {
   return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2)
 }
 
-export default function Workspace({ project, team }) {
+export default function Workspace({ project, team, onBackToHub }) {
+  const { dispatch } = useApp()
   const [activeTab, setActiveTab] = useState('chat')
   const [collapsed, setCollapsed] = useState(false)
+  const [configAgent, setConfigAgent] = useState(null)
   const { theme, toggle: toggleTheme } = useTheme()
 
   const renderTab = () => {
@@ -45,8 +49,18 @@ export default function Workspace({ project, team }) {
         style={{ background: 'var(--bg2)', backdropFilter: 'blur(10px)' }}
         aria-label="Главная навигация"
       >
-        {/* Logo + project */}
+        {/* Back to hub + Logo + project */}
         <div className={`flex flex-col ${collapsed ? 'items-center py-3' : 'px-4 py-4'} border-b border-[var(--card-border)] shrink-0`}>
+          {onBackToHub && (
+            <button
+              onClick={onBackToHub}
+              className={`flex items-center ${collapsed ? 'justify-center mb-2' : 'gap-2 mb-3'} text-xs text-[var(--t3)] hover:text-[var(--ac)] transition-colors cursor-pointer`}
+              title="Проекты"
+            >
+              <FolderOpen size={14} className="shrink-0" />
+              {!collapsed && <span>Проекты</span>}
+            </button>
+          )}
           <span className={`text-[20px] font-bold leading-none logo-gradient`} style={{ letterSpacing: '-0.5px' }}>
             {collapsed ? 'S' : 'Sqwady'}
           </span>
@@ -98,9 +112,11 @@ export default function Workspace({ project, team }) {
                 const color = desk?.color || t.color || 'var(--ac)'
                 const initials = getInitials(name)
                 return (
-                  <div
+                  <button
                     key={t.id || t.role}
-                    className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors"
+                    onClick={() => setConfigAgent(t)}
+                    className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors cursor-pointer w-full text-left bg-transparent border-none"
+                    style={{ fontFamily: 'inherit' }}
                   >
                     <div className="relative shrink-0">
                       <div
@@ -111,10 +127,11 @@ export default function Workspace({ project, team }) {
                       </div>
                       <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
                     </div>
-                    <span className="text-[13px] font-medium text-[var(--t)] truncate">
-                      {name}
-                    </span>
-                  </div>
+                    <div className="min-w-0">
+                      <div className="text-[13px] font-medium text-[var(--t)] truncate">{name}</div>
+                      <div className="text-[11px] text-[var(--t3)] truncate">{desk?.label}</div>
+                    </div>
+                  </button>
                 )
               })}
             </div>
@@ -148,6 +165,22 @@ export default function Workspace({ project, team }) {
       <main className="flex-1 flex overflow-hidden bg-[var(--bg)]">
         {renderTab()}
       </main>
+
+      {/* Agent profile modal */}
+      {configAgent && (
+        <AgentConfigModal
+          agent={configAgent}
+          projectName={project.name}
+          onSave={(data) => {
+            dispatch({
+              type: 'UPDATE_AGENT',
+              payload: { id: configAgent.id, ...data },
+            })
+            setConfigAgent(null)
+          }}
+          onClose={() => setConfigAgent(null)}
+        />
+      )}
     </div>
   )
 }
