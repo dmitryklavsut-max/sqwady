@@ -15,10 +15,7 @@ function AppRoutes() {
         <Landing onGo={() => setPage('project')} />
       )}
       {page === 'project' && (
-        <ProjectSetup onNext={(p) => {
-          dispatch({ type: 'SET_PROJECT', payload: p })
-          setPage('office')
-        }} />
+        <ProjectSetup onNext={() => setPage('office')} />
       )}
       {page === 'office' && state.project && (
         <OfficeBuild
