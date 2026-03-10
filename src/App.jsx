@@ -3,6 +3,7 @@ import { AppProvider, useApp } from './context/AppContext'
 import Landing from './pages/Landing'
 import ProjectSetup from './pages/ProjectSetup'
 import OfficeBuild from './components/OfficeBuild'
+import GenerationScreen from './pages/GenerationScreen'
 import Workspace from './pages/Workspace'
 
 function AppRoutes() {
@@ -22,9 +23,12 @@ function AppRoutes() {
           project={state.project}
           onDone={(t) => {
             dispatch({ type: 'SET_TEAM', payload: t })
-            setPage('workspace')
+            setPage('generation')
           }}
         />
+      )}
+      {page === 'generation' && state.project && state.team.length > 0 && (
+        <GenerationScreen onDone={() => setPage('workspace')} />
       )}
       {page === 'workspace' && state.project && state.team.length > 0 && (
         <Workspace project={state.project} team={state.team} />

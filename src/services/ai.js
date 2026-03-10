@@ -1,7 +1,8 @@
 import { DESKS } from '../data/constants.js'
 
 // ─── Anthropic API config ───────────────────────────────────────────
-const API_URL = '/api/recommend'
+const RECOMMEND_URL = '/api/recommend'
+const GENERATE_URL = '/api/generate'
 const MODEL = 'claude-sonnet-4-20250514'
 
 // ─── generateRecommendations ────────────────────────────────────────
@@ -9,7 +10,7 @@ const MODEL = 'claude-sonnet-4-20250514'
 // Returns { businessModel, competitors, techStack, teamComposition, agentDefaults }
 export async function generateRecommendations(project) {
   try {
-    const res = await fetch(API_URL, {
+    const res = await fetch(RECOMMEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project, model: MODEL }),
@@ -23,6 +24,175 @@ export async function generateRecommendations(project) {
     console.warn('AI recommendations unavailable, using fallback:', err.message)
     return generateFallbackRecommendations(project)
   }
+}
+
+// ─── generateWorkspaceContent ───────────────────────────────────────
+// Takes project + team, returns tasks, roadmap, economics, slides, wiki, chat, memory
+export async function generateWorkspaceContent(project, team) {
+  try {
+    const res = await fetch(GENERATE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ project, team, model: MODEL }),
+    })
+
+    if (!res.ok) throw new Error(`API ${res.status}`)
+
+    const data = await res.json()
+    return data
+  } catch (err) {
+    console.warn('AI workspace generation unavailable, using fallback:', err.message)
+    return generateFallbackWorkspace(project, team)
+  }
+}
+
+// ─── Fallback workspace content ─────────────────────────────────────
+function generateFallbackWorkspace(project, team) {
+  const name = project.name || 'Проект'
+  const desc = project.description || ''
+  const features = (project.mvpFeatures || '').split('\n').filter(Boolean)
+  const stack = project.techStack || 'React, Node.js, PostgreSQL'
+  const model = project.businessModel || 'Subscription'
+  const pricing = project.pricing || '$9/$49/$199'
+  const timeline = project.timeline || '3 мес'
+
+  // Build team name map
+  const teamMap = {}
+  team.forEach(t => {
+    teamMap[t.role || t.id] = t.personality?.name || t.label
+  })
+  const teamRoles = team.map(t => t.role || t.id)
+  const getAssignee = (preferred) => {
+    for (const r of preferred) {
+      if (teamRoles.includes(r)) return r
+    }
+    return teamRoles[0] || 'cto'
+  }
+
+  // Tasks — 12 project-specific tasks
+  const taskTemplates = [
+    { title: `Настроить репозиторий ${name}`, desc: 'Инициализация проекта, CI/CD, линтеры', assignee: ['ops', 'cto', 'back'], priority: 'P0', column: 'in_progress', tags: ['infra'] },
+    { title: `Спроектировать архитектуру ${name}`, desc: `Выбрать паттерны для ${stack}`, assignee: ['cto', 'back'], priority: 'P0', column: 'in_progress', tags: ['arch'] },
+    { title: 'Дизайн основных экранов', desc: 'Wireframes и UI kit в Figma', assignee: ['des', 'front'], priority: 'P0', column: 'todo', tags: ['design'] },
+    { title: 'Настроить базу данных', desc: 'Схема, миграции, сиды', assignee: ['back', 'cto'], priority: 'P1', column: 'todo', tags: ['backend'] },
+    { title: 'API авторизации', desc: 'Регистрация, логин, JWT токены', assignee: ['back', 'cto'], priority: 'P1', column: 'todo', tags: ['backend', 'auth'] },
+    { title: 'Верстка лендинга', desc: `Главная страница ${name}`, assignee: ['front', 'des'], priority: 'P1', column: 'backlog', tags: ['frontend'] },
+    { title: 'Написать pitch deck', desc: `Презентация ${name} для инвесторов`, assignee: ['ceo', 'pm', 'mrk'], priority: 'P1', column: 'todo', tags: ['business'] },
+    { title: 'Исследование конкурентов', desc: 'Анализ рынка и конкурентных преимуществ', assignee: ['pm', 'ceo', 'mrk'], priority: 'P2', column: 'backlog', tags: ['research'] },
+    { title: 'Настроить мониторинг', desc: 'Логи, алерты, метрики', assignee: ['ops', 'cto', 'back'], priority: 'P2', column: 'backlog', tags: ['infra'] },
+    { title: 'Написать тесты', desc: 'Unit и integration тесты для ядра', assignee: ['qa', 'back', 'front'], priority: 'P2', column: 'backlog', tags: ['testing'] },
+    { title: 'SEO и аналитика', desc: 'Google Analytics, метатеги, sitemap', assignee: ['mrk', 'front'], priority: 'P3', column: 'backlog', tags: ['marketing'] },
+    { title: 'Документация API', desc: 'Swagger/OpenAPI спецификация', assignee: ['wr', 'back', 'cto'], priority: 'P2', column: 'backlog', tags: ['docs'] },
+  ]
+
+  // Add feature-specific tasks
+  features.slice(0, 3).forEach((feat, i) => {
+    taskTemplates.push({
+      title: `Реализовать: ${feat.trim()}`,
+      desc: `MVP реализация фичи "${feat.trim()}" для ${name}`,
+      assignee: ['back', 'front', 'cto'],
+      priority: i === 0 ? 'P0' : 'P1',
+      column: i === 0 ? 'in_progress' : 'todo',
+      tags: ['feature'],
+    })
+  })
+
+  const tasks = taskTemplates.map((t, i) => ({
+    id: `t${i + 1}`,
+    title: t.title,
+    description: t.desc,
+    assignee: getAssignee(t.assignee),
+    priority: t.priority,
+    column: t.column,
+    tags: t.tags,
+    dueDate: null,
+    createdAt: new Date().toISOString().slice(0, 10),
+  }))
+
+  // Roadmap
+  const roadmap = [
+    { id: 'r1', phase: `Phase 1 — MVP ${name}`, color: '#6366f1', start: 0, duration: 3, items: features.slice(0, 4).map(f => f.trim()).concat(['CI/CD', 'Тестирование']).slice(0, 4) },
+    { id: 'r2', phase: 'Phase 2 — Beta', color: '#06b6d4', start: 3, duration: 3, items: ['Обратная связь от пользователей', 'Оптимизация', 'Расширение фич', 'Публичный бета-тест'] },
+    { id: 'r3', phase: 'Phase 3 — Launch', color: '#10b981', start: 6, duration: 3, items: ['Маркетинговый запуск', 'PR-кампания', 'Онбординг', 'Монетизация'] },
+    { id: 'r4', phase: 'Phase 4 — Scale', color: '#f59e0b', start: 9, duration: 3, items: ['Масштабирование', 'Новые рынки', 'Enterprise', 'Команда x2'] },
+  ]
+
+  // Economics
+  const economics = {
+    months: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+    revenue: [0, 0, 2, 5, 12, 25, 40, 60, 90, 125, 170, 220],
+    costs: [30, 30, 35, 38, 40, 45, 50, 55, 60, 65, 70, 78],
+    users: [0, 30, 100, 300, 600, 1200, 2000, 3500, 5500, 8000, 12000, 17000],
+  }
+
+  // Pitch slides
+  const pitchSlides = [
+    { title: 'Проблема', iconName: 'Flame', text: `${desc || name + ' решает ключевую проблему в ' + (project.industry || 'индустрии')}.` },
+    { title: 'Решение', iconName: 'Lightbulb', text: `${name} — ${desc || 'инновационное решение'}.` },
+    { title: 'Рынок', iconName: 'BarChart2', text: `Индустрия ${project.industry || 'Tech'}. Целевая аудитория: ${project.audience || 'бизнес и разработчики'}.` },
+    { title: 'Продукт', iconName: 'Rocket', text: `Ключевые фичи: ${features.slice(0, 3).join(', ') || 'core features'}. Стек: ${stack}.` },
+    { title: 'Бизнес', iconName: 'DollarSign', text: `Модель: ${model}. Тарифы: ${pricing}.` },
+    { title: 'Traction', iconName: 'TrendingUp', text: `Стадия: ${project.stage || 'MVP'}. Таймлайн: ${timeline}.` },
+    { title: 'Команда', iconName: 'Users', text: `${team.length} специалистов: ${team.map(t => t.label).join(', ')}.` },
+    { title: 'Ask', iconName: 'Target', text: `${project.budget || 'Pre-Seed $100-500K'}. Runway: 12 месяцев.` },
+  ]
+
+  // Wiki pages
+  const wikiPages = [
+    { title: 'Architecture Overview', iconName: 'Building', text: `# Архитектура ${name}\n\nСтек: ${stack}\nТип: ${(project.productType || []).join(', ') || 'Веб-приложение'}\n\n## Компоненты\n- Frontend\n- Backend API\n- Database\n- CI/CD pipeline` },
+    { title: 'API Reference', iconName: 'BookOpen', text: `# API ${name}\n\n## Endpoints\n\nPOST /api/auth/login\nPOST /api/auth/register\nGET /api/users/me\n\n## Аутентификация\nJWT Bearer Token` },
+    { title: 'Onboarding', iconName: 'Rocket', text: `# Онбординг — ${name}\n\n1. Клонировать репозиторий\n2. npm install\n3. Настроить .env\n4. npm run dev\n5. Открыть localhost:5173` },
+    { title: 'Team Agreements', iconName: 'Handshake', text: `# Соглашения команды ${name}\n\n- Стендап: ежедневно 10:00\n- Спринт: 2 недели\n- Code review: обязательный\n- Deploy: через CI/CD\n- Коммуникация: Sqwady чат` },
+  ]
+
+  // Chat messages
+  const chatMessages = {
+    general: [],
+    eng: [],
+    prod: [],
+    stand: [],
+  }
+
+  const addMsg = (channel, roleId, text) => {
+    const agent = team.find(t => (t.role || t.id) === roleId)
+    if (!agent) return
+    chatMessages[channel].push({
+      from: roleId,
+      name: agent.personality?.name || agent.label,
+      text,
+      time: `${9 + chatMessages[channel].length}:00`,
+    })
+  }
+
+  // General channel
+  if (teamRoles.includes('ceo')) addMsg('general', 'ceo', `Привет всем! Рад, что команда ${name} в сборе. Давайте начинать!`)
+  if (teamRoles.includes('pm')) addMsg('general', 'pm', `Я подготовила бэклог задач. Приоритеты расставлены, можем начинать спринт.`)
+  if (teamRoles.includes('cto')) addMsg('general', 'cto', `Архитектура готова, стек выбран: ${stack}. Погнали!`)
+
+  // Eng channel
+  if (teamRoles.includes('cto')) addMsg('eng', 'cto', `Ребята, начинаем с настройки инфраструктуры и базовой архитектуры.`)
+  if (teamRoles.includes('back')) addMsg('eng', 'back', `Беру на себя API и базу данных. Схема будет к вечеру.`)
+  if (teamRoles.includes('front')) addMsg('eng', 'front', `Начинаю верстку основных компонентов. Дизайн-система будет готова завтра.`)
+
+  // Prod channel
+  if (teamRoles.includes('pm')) addMsg('prod', 'pm', `Roadmap готов. Phase 1 — 3 месяца до MVP.`)
+  if (teamRoles.includes('des')) addMsg('prod', 'des', `Wireframes основных экранов загружены в Figma.`)
+
+  // Standup
+  team.slice(0, 4).forEach(t => {
+    const role = t.role || t.id
+    const pname = t.personality?.name || t.label
+    addMsg('stand', role, `${pname}: Вчера — настройка окружения. Сегодня — начинаю работу над первыми задачами.`)
+  })
+
+  // Memory files
+  const memoryFiles = {
+    PROJECT: `# ${name}\n\n${desc}\n\n## Данные\n- Индустрия: ${project.industry || 'N/A'}\n- Стадия: ${project.stage || 'N/A'}\n- Аудитория: ${project.audience || 'N/A'}\n- Модель: ${model}\n- Стек: ${stack}\n- MVP фичи: ${features.join(', ') || 'N/A'}\n- Таймлайн: ${timeline}\n- Бюджет: ${project.budget || 'N/A'}`,
+    ARCHITECTURE: `# Архитектура ${name}\n\n## Стек\n${stack}\n\n## Тип продукта\n${(project.productType || []).join(', ') || 'Веб-приложение'}\n\n## Структура\n- Frontend (SPA)\n- Backend API (REST)\n- Database\n- CI/CD`,
+    TEAM_CONTEXT: `# Команда ${name}\n\n${team.map(t => `- **${t.label}** — ${t.personality?.name || 'TBD'} (${t.personality?.experience || 'Middle'})`).join('\n')}`,
+  }
+
+  return { tasks, roadmap, economics, pitchSlides, wikiPages, chatMessages, memoryFiles }
 }
 
 // ─── Fallback: template-based recommendations ───────────────────────
