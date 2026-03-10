@@ -1,10 +1,38 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DndContext, useDraggable, useDroppable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { Plus, UserPlus, X, Check, Armchair, Users, Rocket, Settings } from 'lucide-react'
-import { DESKS, PEOPLE, MODELS } from '../data/constants'
+import { Plus, UserPlus, X, Check, Armchair, Users, Rocket, Settings, Lightbulb, ChevronDown, ChevronUp } from 'lucide-react'
+import { DESKS, PEOPLE, MODELS, WORKSPACE_TABS } from '../data/constants'
+import { useApp } from '../context/AppContext'
 import RoleIcon from './RoleIcon'
 import Avatar from './Avatar'
 import Button from './Button'
+
+const inputClass = 'w-full px-3 py-2 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors'
+const labelClass = 'text-xs font-semibold text-[var(--t2)] uppercase tracking-wide'
+
+const TEMPERAMENTS = ['Аналитик', 'Драйвер', 'Креатив', 'Коммуникатор']
+const COMM_STYLES = ['Лаконичный', 'Детальный', 'Дружеский', 'Формальный']
+const EXP_LEVELS = ['Junior (1-3)', 'Middle (3-6)', 'Senior (6-10)', 'Lead (10+)']
+
+function generateSystemPrompt(role, position, personality, projectName) {
+  const lines = []
+  lines.push(`Ты — ${personality.name}, ${role.label} проекта "${projectName}".`)
+  if (personality.age) lines.push(`Возраст: ${personality.age}. Опыт: ${personality.experience}.`)
+  if (personality.background) lines.push(`Бэкграунд: ${personality.background}.`)
+  if (position.functions?.length) lines.push(`Функции: ${position.functions.join(', ')}.`)
+  if (position.responsibilities?.length) lines.push(`Ответственность: ${position.responsibilities.join(', ')}.`)
+  if (position.interactions?.length) lines.push(`Взаимодействия: ${position.interactions.join('; ')}.`)
+  if (personality.skills?.length) {
+    const sk = Array.isArray(personality.skills) ? personality.skills : personality.skills.split(',').map(s => s.trim())
+    lines.push(`Ключевые навыки: ${sk.join(', ')}.`)
+  }
+  if (personality.temperament) lines.push(`Темперамент: ${personality.temperament}. Стиль: ${personality.communicationStyle}.`)
+  if (personality.strengths) lines.push(`Сильные стороны: ${personality.strengths}.`)
+  if (personality.weaknesses) lines.push(`Слабые стороны: ${personality.weaknesses}.`)
+  if (position.metrics?.length) lines.push(`Метрики успеха: ${position.metrics.join(', ')}.`)
+  lines.push('Отвечай в характере своей роли. Будь полезным и конструктивным.')
+  return lines.join('\n')
+}
 
 /* ── Draggable palette item ─────────────────────────── */
 function DeskDrag({ desk, used }) {
@@ -26,7 +54,6 @@ function DeskDrag({ desk, used }) {
         background: used ? 'var(--bg3)' : 'var(--bg2)',
         opacity: used ? 0.3 : isDragging ? 0.5 : 1,
         cursor: used ? 'default' : 'grab',
-        boxShadow: !used ? 'var(--shadow-card)' : 'none',
       }}
     >
       <div
@@ -120,7 +147,7 @@ function GridSlot({ index, entry, onRemove, onOpenConfig }) {
             >
               <Avatar person={entry.per} size={36} className="mx-auto" />
               <div className="flex items-center justify-center gap-1 text-xs text-[var(--t2)] mt-1 font-medium">
-                {entry.pn || <Settings size={12} />}
+                {entry.personality?.name || <Settings size={12} />}
               </div>
             </div>
           )}
@@ -130,12 +157,69 @@ function GridSlot({ index, entry, onRemove, onOpenConfig }) {
   )
 }
 
-/* ── Config Modal ───────────────────────────────────── */
-function ConfigModal({ entry, onSave, onClose }) {
-  const [name, setName] = useState(entry.pn || '')
-  const [bio, setBio] = useState(entry.bio || '')
-  const [model, setModel] = useState(entry.model)
-  const [mem, setMem] = useState(entry.mem || '')
+/* ── Config Modal — 2 Tabs ─────────────────────────── */
+function ConfigModal({ entry, projectName, onSave, onClose }) {
+  const [tab, setTab] = useState('position')
+
+  const [position, setPosition] = useState({
+    functions: entry.position?.functions || [],
+    responsibilities: entry.position?.responsibilities || [],
+    interactions: entry.position?.interactions || [],
+    modules: entry.position?.modules || WORKSPACE_TABS.map(t => t.id),
+    metrics: entry.position?.metrics || [],
+  })
+
+  const [personality, setPersonality] = useState({
+    name: entry.personality?.name || '',
+    gender: entry.personality?.gender || 'male',
+    age: entry.personality?.age || 28,
+    experience: entry.personality?.experience || 'Middle (3-6)',
+    skills: Array.isArray(entry.personality?.skills) ? entry.personality.skills.join(', ') : (entry.personality?.skills || ''),
+    background: entry.personality?.background || '',
+    strengths: entry.personality?.strengths || '',
+    weaknesses: entry.personality?.weaknesses || '',
+    temperament: entry.personality?.temperament || 'Аналитик',
+    communicationStyle: entry.personality?.communicationStyle || 'Лаконичный',
+  })
+
+  const [model, setModel] = useState(entry.model || 'claude-sonnet-4-6')
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [promptText, setPromptText] = useState(entry.systemPrompt || '')
+
+  const desk = DESKS.find(d => d.id === entry.id) || entry
+
+  // Regenerate prompt when fields change
+  useEffect(() => {
+    const generated = generateSystemPrompt(desk, position, personality, projectName)
+    setPromptText(generated)
+  }, [position, personality, desk, projectName])
+
+  const setPos = (key, val) => setPosition(p => ({ ...p, [key]: val }))
+  const setPers = (key, val) => setPersonality(p => ({ ...p, [key]: val }))
+
+  const arrayToText = (arr) => Array.isArray(arr) ? arr.join('\n') : (arr || '')
+  const textToArray = (text) => text.split('\n').map(s => s.trim()).filter(Boolean)
+
+  const toggleModule = (modId) => {
+    setPosition(p => ({
+      ...p,
+      modules: p.modules.includes(modId)
+        ? p.modules.filter(m => m !== modId)
+        : [...p.modules, modId],
+    }))
+  }
+
+  const handleSave = () => {
+    const skillsArr = personality.skills.split(',').map(s => s.trim()).filter(Boolean)
+    onSave({
+      position,
+      personality: { ...personality, skills: skillsArr },
+      model,
+      systemPrompt: promptText,
+    })
+  }
+
+  const hasAiHints = entry._aiPrefilled
 
   return (
     <div
@@ -144,7 +228,7 @@ function ConfigModal({ entry, onSave, onClose }) {
       onClick={onClose}
     >
       <div
-        className="animate-pop rounded-2xl p-6 w-[420px]"
+        className="animate-pop rounded-2xl w-[520px] max-h-[85vh] flex flex-col"
         style={{
           background: 'var(--card-bg)',
           backdropFilter: 'blur(10px)',
@@ -154,9 +238,9 @@ function ConfigModal({ entry, onSave, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-4 mb-5">
-          <Avatar person={entry.per} size={52} />
-          <div>
+        <div className="flex items-center gap-4 p-5 pb-0">
+          <Avatar person={entry.per} size={48} />
+          <div className="flex-1">
             <div className="flex items-center gap-2">
               <RoleIcon name={entry.iconName} size={18} color={entry.color} />
               <div className="text-base font-bold" style={{ color: entry.color }}>
@@ -165,46 +249,254 @@ function ConfigModal({ entry, onSave, onClose }) {
             </div>
             <div className="text-xs text-[var(--t3)] mt-0.5">Настройка сотрудника</div>
           </div>
+          {hasAiHints && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-[var(--ac)]/10 border border-[var(--ac)]/20">
+              <Lightbulb size={12} className="text-[var(--ac)]" />
+              <span className="text-[10px] text-[var(--ac)] font-medium">Рекомендовано AI</span>
+            </div>
+          )}
         </div>
 
-        {/* Fields */}
-        <div className="flex flex-col gap-3">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Имя"
-            className="w-full px-4 py-3 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors"
-          />
-          <textarea
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={2}
-            placeholder="Bio / роль"
-            className="w-full px-4 py-3 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none resize-y focus:border-[var(--ac)] transition-colors"
-          />
-          <select
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="px-4 py-3 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none"
+        {/* Tabs */}
+        <div className="flex gap-1 px-5 mt-4">
+          <button
+            onClick={() => setTab('position')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none ${
+              tab === 'position'
+                ? 'bg-[var(--ac)] text-white'
+                : 'bg-[var(--bg2)] text-[var(--t2)] hover:text-[var(--t)]'
+            }`}
           >
-            {MODELS.map((m) => (
-              <option key={m.id} value={m.id}>{m.label}</option>
-            ))}
-          </select>
-          <input
-            value={mem}
-            onChange={(e) => setMem(e.target.value)}
-            placeholder="Memory URL"
-            className="w-full px-4 py-3 rounded-lg text-xs text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none font-mono focus:border-[var(--ac)] transition-colors"
-          />
+            Должность
+          </button>
+          <button
+            onClick={() => setTab('personality')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none ${
+              tab === 'personality'
+                ? 'bg-[var(--ac)] text-white'
+                : 'bg-[var(--bg2)] text-[var(--t2)] hover:text-[var(--t)]'
+            }`}
+          >
+            Личность
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-3">
+          {tab === 'position' && (
+            <>
+              <div>
+                <label className={labelClass}>Роль</label>
+                <div className="mt-1 px-3 py-2 rounded-lg bg-[var(--bg3)] text-sm font-medium" style={{ color: entry.color }}>
+                  {entry.label}
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Должностные функции</label>
+                <textarea
+                  value={arrayToText(position.functions)}
+                  onChange={(e) => setPos('functions', textToArray(e.target.value))}
+                  rows={3}
+                  placeholder="По одной на строку"
+                  className={`${inputClass} resize-y mt-1`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Зона ответственности</label>
+                <textarea
+                  value={arrayToText(position.responsibilities)}
+                  onChange={(e) => setPos('responsibilities', textToArray(e.target.value))}
+                  rows={3}
+                  placeholder="По одной на строку"
+                  className={`${inputClass} resize-y mt-1`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Взаимодействия</label>
+                <textarea
+                  value={arrayToText(position.interactions)}
+                  onChange={(e) => setPos('interactions', textToArray(e.target.value))}
+                  rows={2}
+                  placeholder="От кого получает / кому передаёт"
+                  className={`${inputClass} resize-y mt-1`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Активные модули</label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {WORKSPACE_TABS.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => toggleModule(t.id)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        position.modules.includes(t.id)
+                          ? 'bg-[var(--ac)] text-white border-[var(--ac)]'
+                          : 'bg-[var(--bg2)] text-[var(--t3)] border-[var(--bd)] hover:border-[var(--ac)]'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Метрики успеха</label>
+                <textarea
+                  value={arrayToText(position.metrics)}
+                  onChange={(e) => setPos('metrics', textToArray(e.target.value))}
+                  rows={2}
+                  placeholder="По одной на строку"
+                  className={`${inputClass} resize-y mt-1`}
+                />
+              </div>
+            </>
+          )}
+
+          {tab === 'personality' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Имя</label>
+                  <input
+                    value={personality.name}
+                    onChange={(e) => setPers('name', e.target.value)}
+                    placeholder="Имя"
+                    className={`${inputClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Гендер</label>
+                  <select
+                    value={personality.gender}
+                    onChange={(e) => setPers('gender', e.target.value)}
+                    className={`${inputClass} mt-1 cursor-pointer`}
+                  >
+                    <option value="male">Мужской</option>
+                    <option value="female">Женский</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Возраст</label>
+                  <input
+                    type="number"
+                    min={18}
+                    max={65}
+                    value={personality.age}
+                    onChange={(e) => setPers('age', Number(e.target.value))}
+                    className={`${inputClass} mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Опыт</label>
+                  <select
+                    value={personality.experience}
+                    onChange={(e) => setPers('experience', e.target.value)}
+                    className={`${inputClass} mt-1 cursor-pointer`}
+                  >
+                    {EXP_LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Ключевые скилы</label>
+                <input
+                  value={personality.skills}
+                  onChange={(e) => setPers('skills', e.target.value)}
+                  placeholder="React, TypeScript, System Design..."
+                  className={`${inputClass} mt-1`}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Предыдущий опыт</label>
+                <textarea
+                  value={personality.background}
+                  onChange={(e) => setPers('background', e.target.value)}
+                  rows={2}
+                  placeholder="Например: 10 лет в FAANG, ex-Google"
+                  className={`${inputClass} resize-y mt-1`}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Сильные стороны</label>
+                  <textarea
+                    value={personality.strengths}
+                    onChange={(e) => setPers('strengths', e.target.value)}
+                    rows={2}
+                    className={`${inputClass} resize-y mt-1`}
+                  />
+                </div>
+                <div>
+                  <label className={labelClass}>Слабые стороны</label>
+                  <textarea
+                    value={personality.weaknesses}
+                    onChange={(e) => setPers('weaknesses', e.target.value)}
+                    rows={2}
+                    className={`${inputClass} resize-y mt-1`}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelClass}>Темперамент</label>
+                  <select
+                    value={personality.temperament}
+                    onChange={(e) => setPers('temperament', e.target.value)}
+                    className={`${inputClass} mt-1 cursor-pointer`}
+                  >
+                    {TEMPERAMENTS.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Стиль коммуникации</label>
+                  <select
+                    value={personality.communicationStyle}
+                    onChange={(e) => setPers('communicationStyle', e.target.value)}
+                    className={`${inputClass} mt-1 cursor-pointer`}
+                  >
+                    {COMM_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>LLM модель</label>
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className={`${inputClass} mt-1 cursor-pointer`}
+                >
+                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <button
+                  onClick={() => setShowPrompt(!showPrompt)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-[var(--t2)] uppercase tracking-wide cursor-pointer bg-transparent border-none hover:text-[var(--ac)] transition-colors"
+                >
+                  System Prompt Preview
+                  {showPrompt ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+                {showPrompt && (
+                  <textarea
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                    rows={6}
+                    className={`${inputClass} resize-y mt-1 font-mono text-xs`}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 mt-5">
+        <div className="flex justify-end gap-3 p-5 pt-3 border-t border-[var(--bd)]">
           <Button onClick={onClose} variant="ghost" small>
             <X size={14} /> Отмена
           </Button>
-          <Button onClick={() => onSave({ pn: name, bio, model, mem })} small>
+          <Button onClick={handleSave} small>
             <Check size={14} /> Сохранить
           </Button>
         </div>
@@ -215,40 +507,96 @@ function ConfigModal({ entry, onSave, onClose }) {
 
 /* ── Main Component ─────────────────────────────────── */
 export default function OfficeBuild({ project, onDone }) {
+  const { state } = useApp()
+  const recs = state.recommendations
   const [placed, setPlaced] = useState([])
   const [configSlot, setConfigSlot] = useState(null)
   const [activeItem, setActiveItem] = useState(null)
+  const initialized = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
 
+  // Auto-place recommended team on mount
+  useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
+    const teamComp = recs?.teamComposition || []
+    const agentDefs = recs?.agentDefaults || {}
+
+    if (teamComp.length === 0) return
+
+    const autoPlaced = []
+    let personIdx = 0
+    teamComp.forEach((rec, i) => {
+      if (i >= 8) return // max 8 slots
+      const desk = DESKS.find(d => d.id === rec.role)
+      if (!desk) return
+      const person = PEOPLE[personIdx % PEOPLE.length]
+      personIdx++
+      const defaults = agentDefs[rec.role] || {}
+      autoPlaced.push({
+        ...desk,
+        slot: i,
+        per: person,
+        position: defaults.position || { functions: [], responsibilities: [], interactions: [], modules: WORKSPACE_TABS.map(t => t.id), metrics: [] },
+        personality: defaults.personality || {},
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        _aiPrefilled: true,
+      })
+    })
+
+    // Generate system prompts for each auto-placed agent
+    autoPlaced.forEach(agent => {
+      agent.systemPrompt = generateSystemPrompt(
+        DESKS.find(d => d.id === agent.id) || agent,
+        agent.position,
+        agent.personality,
+        project.name
+      )
+    })
+
+    setPlaced(autoPlaced)
+  }, [recs, project.name])
+
   const addDesk = (deskId, slotIndex) => {
-    if (placed.find((p) => p.slot === slotIndex)) return
-    const desk = DESKS.find((d) => d.id === deskId)
+    if (placed.find(p => p.slot === slotIndex)) return
+    const desk = DESKS.find(d => d.id === deskId)
     if (!desk) return
-    setPlaced((prev) => [
+    setPlaced(prev => [
       ...prev,
-      { ...desk, slot: slotIndex, per: null, pn: '', model: 'claude-sonnet-4-6', bio: desk.bio, mem: '' },
+      {
+        ...desk,
+        slot: slotIndex,
+        per: null,
+        position: { functions: [], responsibilities: [], interactions: [], modules: WORKSPACE_TABS.map(t => t.id), metrics: [] },
+        personality: {},
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        _aiPrefilled: false,
+      },
     ])
   }
 
   const seatPerson = (personId, slotIndex) => {
-    const person = PEOPLE.find((p) => p.id === personId)
+    const person = PEOPLE.find(p => p.id === personId)
     if (!person) return
-    setPlaced((prev) =>
-      prev.map((x) => (x.slot === slotIndex ? { ...x, per: person } : x))
+    setPlaced(prev =>
+      prev.map(x => (x.slot === slotIndex ? { ...x, per: person } : x))
     )
     setConfigSlot(slotIndex)
   }
 
   const updateEntry = (slotIndex, data) => {
-    setPlaced((prev) => prev.map((x) => (x.slot === slotIndex ? { ...x, ...data } : x)))
+    setPlaced(prev => prev.map(x => (x.slot === slotIndex ? { ...x, ...data } : x)))
     setConfigSlot(null)
   }
 
   const removeDesk = (slotIndex) => {
-    setPlaced((prev) => prev.filter((x) => x.slot !== slotIndex))
+    setPlaced(prev => prev.filter(x => x.slot !== slotIndex))
   }
 
   const handleDragStart = (event) => {
@@ -268,23 +616,46 @@ export default function OfficeBuild({ project, onDone }) {
     if (data.type === 'desk') {
       addDesk(data.desk.id, slotIndex)
     } else if (data.type === 'person') {
-      const entry = placed.find((p) => p.slot === slotIndex)
+      const entry = placed.find(p => p.slot === slotIndex)
       if (entry && !entry.per) {
         seatPerson(data.person.id, slotIndex)
       }
     }
   }
 
-  const usedDeskIds = new Set(placed.map((p) => p.id))
-  const seatedCount = placed.filter((p) => p.per).length
+  const handleDone = () => {
+    const team = placed
+      .filter(p => p.per)
+      .map(p => ({
+        id: p.id,
+        role: p.id,
+        label: p.label,
+        icon: p.iconName,
+        color: p.color,
+        position: p.position,
+        personality: p.personality,
+        model: p.model,
+        systemPrompt: p.systemPrompt,
+        temperature: 0.7,
+      }))
+    onDone(team)
+  }
 
-  const configEntry = configSlot !== null ? placed.find((p) => p.slot === configSlot) : null
+  const usedDeskIds = new Set(placed.map(p => p.id))
+  const seatedCount = placed.filter(p => p.per).length
+  const configEntry = configSlot !== null ? placed.find(p => p.slot === configSlot) : null
+
+  // Recommended team chips
+  const recRoles = (recs?.teamComposition || []).map(r => {
+    const desk = DESKS.find(d => d.id === r.role)
+    return desk ? desk.label : r.role
+  }).filter(Boolean)
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen flex flex-col p-6">
         {/* Header */}
-        <div className="text-center mb-6 animate-fade-up">
+        <div className="text-center mb-4 animate-fade-up">
           <div className="text-sm font-semibold text-[var(--ac)] tracking-widest uppercase mb-1">
             Шаг 2
           </div>
@@ -296,6 +667,26 @@ export default function OfficeBuild({ project, onDone }) {
           </p>
         </div>
 
+        {/* AI Recommendation banner */}
+        {recRoles.length > 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-[var(--ac)]/8 border border-[var(--ac)]/15 animate-fade-in">
+            <Lightbulb size={16} className="text-[var(--ac)] shrink-0" />
+            <div>
+              <span className="text-xs text-[var(--ac)] font-medium">Рекомендуемая команда для {project.name}:</span>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {recRoles.map((name, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-0.5 rounded-md bg-[var(--ac)]/15 text-[var(--ac)] text-xs font-semibold"
+                  >
+                    {name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main area */}
         <div className="flex flex-1 gap-4 overflow-hidden">
           {/* Sidebar: Palette */}
@@ -304,7 +695,7 @@ export default function OfficeBuild({ project, onDone }) {
               <Armchair size={14} />
               Столы
             </div>
-            {DESKS.map((desk) => (
+            {DESKS.map(desk => (
               <DeskDrag key={desk.id} desk={desk} used={usedDeskIds.has(desk.id)} />
             ))}
 
@@ -313,7 +704,7 @@ export default function OfficeBuild({ project, onDone }) {
               Люди
             </div>
             <div className="flex flex-wrap gap-2">
-              {PEOPLE.map((person) => (
+              {PEOPLE.map(person => (
                 <PersonDrag key={person.id} person={person} />
               ))}
             </div>
@@ -338,7 +729,7 @@ export default function OfficeBuild({ project, onDone }) {
                 <GridSlot
                   key={i}
                   index={i}
-                  entry={placed.find((p) => p.slot === i)}
+                  entry={placed.find(p => p.slot === i)}
                   onRemove={removeDesk}
                   onOpenConfig={setConfigSlot}
                 />
@@ -350,10 +741,10 @@ export default function OfficeBuild({ project, onDone }) {
         {/* Footer */}
         <div className="flex justify-between items-center mt-4">
           <span className="text-xs text-[var(--t3)] font-medium">
-            {seatedCount} сотрудников · {placed.length} столов
+            {seatedCount} сотр · {placed.length} столов
           </span>
           <Button
-            onClick={() => onDone(placed.filter((p) => p.per))}
+            onClick={handleDone}
             disabled={seatedCount < 1}
             style={{ padding: '12px 32px' }}
           >
@@ -385,6 +776,7 @@ export default function OfficeBuild({ project, onDone }) {
       {configEntry && (
         <ConfigModal
           entry={configEntry}
+          projectName={project.name}
           onSave={(data) => updateEntry(configSlot, data)}
           onClose={() => setConfigSlot(null)}
         />
