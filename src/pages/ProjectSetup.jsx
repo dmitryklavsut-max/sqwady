@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
+import { generateRecommendations } from '../services/ai'
 import Button from '../components/Button'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Lightbulb } from 'lucide-react'
 
 const INDUSTRIES = ['SaaS', 'FinTech', 'HealthTech', 'EdTech', 'E-commerce', 'AI/ML', 'Marketplace', 'GameDev', 'Другое']
 const STAGES = ['Идея', 'MVP', 'Бета', 'Запущен']
@@ -18,10 +19,31 @@ function Hint() {
   return <span className="text-[var(--t3)] text-xs font-normal normal-case tracking-normal ml-1">необязательно</span>
 }
 
+function AiHint({ children, loading }) {
+  if (loading) {
+    return (
+      <div className="flex items-center gap-1.5 mt-1 animate-fade-in">
+        <Loader2 size={12} className="text-[var(--ac)] animate-spin" />
+        <span className="text-xs text-[var(--ac)] italic">AI анализирует...</span>
+      </div>
+    )
+  }
+  if (!children) return null
+  return (
+    <div className="flex items-start gap-1.5 mt-1 animate-fade-in">
+      <Lightbulb size={12} className="text-[var(--ac)] mt-0.5 shrink-0" />
+      <span className="text-xs text-[var(--ac)] italic">{children}</span>
+    </div>
+  )
+}
+
 export default function ProjectSetup({ onNext }) {
   const { state, dispatch } = useApp()
   const [step, setStep] = useState(1)
+  const [recsLoading, setRecsLoading] = useState(false)
+  const prefilled = useRef(false)
 
+  const recs = state.recommendations
   const saved = state.project || {}
   const [form, setForm] = useState({
     name: saved.name || '',
@@ -40,6 +62,27 @@ export default function ProjectSetup({ onNext }) {
     timeline: saved.timeline || '',
     budget: saved.budget || '',
   })
+
+  // Pre-fill empty fields when recommendations arrive
+  useEffect(() => {
+    if (!recs || prefilled.current) return
+    prefilled.current = true
+    setForm((f) => {
+      const updates = {}
+      if (!f.competitors && recs.competitors) {
+        updates.competitors = Array.isArray(recs.competitors)
+          ? recs.competitors.join(', ')
+          : recs.competitors
+      }
+      if (!f.techStack && recs.techStack) {
+        const ts = recs.techStack
+        updates.techStack = typeof ts === 'string'
+          ? ts
+          : Object.values(ts).filter(Boolean).join(', ')
+      }
+      return Object.keys(updates).length ? { ...f, ...updates } : f
+    })
+  }, [recs])
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }))
 
@@ -65,8 +108,25 @@ export default function ProjectSetup({ onNext }) {
 
   const goNext = () => {
     save()
-    if (step < 3) {
-      setStep(step + 1)
+    if (step === 1) {
+      // Trigger AI recommendations when leaving step 1
+      if (!recs && !recsLoading) {
+        setRecsLoading(true)
+        prefilled.current = false
+        generateRecommendations({
+          name: form.name,
+          description: form.description,
+          industry: form.industry,
+          stage: form.stage,
+          audience: form.audience,
+        }).then((result) => {
+          dispatch({ type: 'SET_RECOMMENDATIONS', payload: result })
+          setRecsLoading(false)
+        }).catch(() => setRecsLoading(false))
+      }
+      setStep(2)
+    } else if (step === 2) {
+      setStep(3)
     } else {
       onNext()
     }
@@ -160,12 +220,21 @@ export default function ProjectSetup({ onNext }) {
         {/* Step 2 — Business */}
         {step === 2 && (
           <div className="flex flex-col gap-4 text-left">
+            {recsLoading && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ac)]/10 border border-[var(--ac)]/20 animate-fade-in">
+                <Loader2 size={14} className="text-[var(--ac)] animate-spin" />
+                <span className="text-xs text-[var(--ac)] font-medium">AI анализирует проект...</span>
+              </div>
+            )}
             <div className="flex flex-col gap-1.5">
               <label className={labelClass}>Бизнес-модель</label>
               <select value={form.businessModel} onChange={(e) => set('businessModel', e.target.value)} className={selectClass}>
                 <option value="">Выбери модель</option>
                 {BIZ_MODELS.map((m) => <option key={m} value={m}>{m}</option>)}
               </select>
+              <AiHint loading={recsLoading}>
+                {recs?.businessModel && `Рекомендуем: ${recs.businessModel.model} — ${recs.businessModel.reason}`}
+              </AiHint>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelClass}>Ценообразование <Hint /></label>
@@ -194,6 +263,9 @@ export default function ProjectSetup({ onNext }) {
                 placeholder="Основные конкуренты и их слабые стороны"
                 className={`${inputClass} resize-y`}
               />
+              <AiHint loading={recsLoading}>
+                {recs?.competitors && `Возможные конкуренты: ${Array.isArray(recs.competitors) ? recs.competitors.join(', ') : recs.competitors}`}
+              </AiHint>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelClass}>Конкурентное преимущество <Hint /></label>
@@ -237,6 +309,9 @@ export default function ProjectSetup({ onNext }) {
                 placeholder="React, Node.js, PostgreSQL..."
                 className={inputClass}
               />
+              <AiHint loading={recsLoading}>
+                {recs?.techStack && `Рекомендуемый стек: ${typeof recs.techStack === 'string' ? recs.techStack : Object.values(recs.techStack).filter(Boolean).join(', ')}`}
+              </AiHint>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelClass}>Ключевые фичи MVP</label>
@@ -254,6 +329,9 @@ export default function ProjectSetup({ onNext }) {
                 <option value="">Выбери срок</option>
                 {TIMELINES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
+              <AiHint>
+                {recs?.teamComposition && form.mvpFeatures && `При ${form.mvpFeatures.split('\n').filter(Boolean).length || 1} фичах и команде из ${recs.teamComposition.length} человек — рекомендуем ${form.stage === 'Идея' ? '3-6 мес' : '1-3 мес'}`}
+              </AiHint>
             </div>
             <div className="flex flex-col gap-1.5">
               <label className={labelClass}>Бюджет <Hint /></label>
