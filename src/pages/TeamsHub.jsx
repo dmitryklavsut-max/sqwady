@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ArrowLeft, Plus, Trash2, Users, Bot, Copy, X, Check } from 'lucide-react'
 import { listTeamTemplates, deleteTeamTemplate, saveTeamTemplate, listAgentConfigs, deleteAgentConfig, saveAgentConfig } from '../context/AppContext'
-import { DESKS, MODELS } from '../data/constants'
+import { DESKS, ROLES, MODELS } from '../data/constants'
 import RoleIcon from '../components/RoleIcon'
 
 const inputClass = 'w-full px-3 py-2 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors'
@@ -80,7 +80,7 @@ function TeamEditorModal({ onSave, onClose, existingTeam }) {
           <div>
             <label className={labelClass}>Добавить роль</label>
             <div className="grid grid-cols-3 gap-2 mt-2">
-              {DESKS.filter(d => !usedRoles.has(d.id)).map(desk => (
+              {ROLES.filter(d => !usedRoles.has(d.id)).map(desk => (
                 <button
                   key={desk.id}
                   onClick={() => addRole(desk.id)}
@@ -135,7 +135,7 @@ function AgentEditorModal({ onSave, onClose }) {
             <label className={labelClass}>Роль</label>
             <select value={role} onChange={e => setRole(e.target.value)} className={inputClass}>
               <option value="">Выберите роль...</option>
-              {DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+              {ROLES.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
             </select>
           </div>
           <div>

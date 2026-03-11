@@ -1,4 +1,4 @@
-import { DESKS } from '../data/constants'
+import { DESKS, resolveRoleId } from '../data/constants'
 
 // ── Role-specific SOPs ──────────────────────────────────────────────
 const ROLE_SOPS = {
@@ -241,10 +241,303 @@ const ROLE_SOPS = {
 3. Напиши тесты с правильной структурой (AAA pattern)
 4. Настрой запуск в CI/CD
 5. Мониторь flaky тесты`,
+  // === New role ID aliases (map to same SOPs) ===
+  backend: null, frontend: null, mobile: null, ml_eng: null,
+  devops: null, designer: null, marketer: null, writer: null,
+
+  // === New roles without existing SOP → generic SOP ===
+  coo: `## Процедура операционного управления
+1. Проанализируй текущие процессы и метрики эффективности
+2. Определи узкие места и bottlenecks
+3. Разработай план оптимизации процессов
+4. Внедри KPI для каждого отдела
+5. Мониторь выполнение и корректируй
+
+## Процедура масштабирования
+1. Оцени текущую нагрузку и ресурсы
+2. Определи точки роста и ограничения
+3. Спроектируй процессы для x10 масштаба
+4. Автоматизируй повторяющиеся операции`,
+
+  cfo: `## Процедура финансового планирования
+1. Составь P&L прогноз на 12 месяцев
+2. Рассчитай unit economics (CAC, LTV, payback)
+3. Определи runway и burn rate
+4. Подготовь финансовую модель для инвесторов
+5. Мониторь ключевые финансовые метрики
+
+## Процедура бюджетирования
+1. Собери запросы от всех отделов
+2. Приоритизируй расходы по ROI
+3. Утверди бюджет с CEO
+4. Мониторь исполнение ежемесячно`,
+
+  cmo: `## Процедура маркетинговой стратегии
+1. Проанализируй целевую аудиторию и конкурентов
+2. Определи каналы привлечения по ROI
+3. Разработай контент-стратегию
+4. Установи KPI: CAC, конверсия, retention
+5. Запусти тестовые кампании и оптимизируй`,
+
+  cpo: `## Процедура продуктовой стратегии
+1. Проведи user research и анализ рынка
+2. Определи product-market fit метрики
+3. Составь продуктовый roadmap на квартал
+4. Приоритизируй фичи по impact/effort
+5. Определи success metrics для каждой фичи`,
+
+  po: `## Процедура управления бэклогом
+1. Собери и структурируй требования от стейкхолдеров
+2. Напиши user stories с acceptance criteria
+3. Приоритизируй по бизнес-ценности
+4. Планируй спринты с командой
+5. Проводи приёмку выполненных задач`,
+
+  ba: `## Процедура бизнес-анализа
+1. Проведи интервью со стейкхолдерами
+2. Задокументируй бизнес-требования
+3. Создай BPMN-диаграммы процессов
+4. Подготовь спецификацию для разработки
+5. Валидируй решение с заказчиком`,
+
+  ux_researcher: `## Процедура пользовательского исследования
+1. Определи исследовательские вопросы
+2. Выбери метод: интервью, опрос, юзабилити-тест
+3. Подготовь сценарии и рекрутируй участников
+4. Проведи исследование и зафиксируй инсайты
+5. Подготовь отчёт с рекомендациями`,
+
+  tech_lead: `## Процедура технического лидерства
+1. Определи архитектурные стандарты проекта
+2. Проводи code review всех PR
+3. Менторь junior/middle разработчиков
+4. Управляй техническим долгом
+5. Принимай технические решения с обоснованием`,
+
+  fullstack: `## Процедура fullstack разработки
+1. Проанализируй требования (frontend + backend)
+2. Спроектируй API контракт
+3. Реализуй backend: endpoints, валидация, БД
+4. Реализуй frontend: компоненты, state, интеграция
+5. Напиши тесты и задокументируй`,
+
+  security: `## Процедура аудита безопасности
+1. Проведи анализ поверхности атаки
+2. Проверь OWASP Top 10 уязвимости
+3. Протестируй аутентификацию и авторизацию
+4. Проверь шифрование данных в покое и транзите
+5. Составь отчёт с приоритизированными рекомендациями`,
+
+  ux_designer: `## Процедура UX-проектирования
+1. Изучи пользовательские сценарии и боли
+2. Создай information architecture
+3. Спроектируй wireframes ключевых экранов
+4. Проведи юзабилити-тестирование
+5. Итерируй на основе фидбека`,
+
+  graphic_designer: `## Процедура создания визуалов
+1. Изучи бренд-гайдлайны и стиль
+2. Создай концепции визуального решения
+3. Разработай финальные макеты
+4. Подготовь assets в нужных форматах
+5. Задокументируй в дизайн-системе`,
+
+  motion_designer: `## Процедура создания анимации
+1. Определи цель анимации (UX, маркетинг, обучение)
+2. Создай раскадровку и тайминг
+3. Разработай анимацию в After Effects / Lottie
+4. Оптимизируй для web/mobile (размер, FPS)
+5. Передай developers с документацией`,
+
+  data_scientist: `## Процедура анализа данных
+1. Сформулируй гипотезу и метрики
+2. Собери и подготовь данные
+3. Проведи exploratory data analysis
+4. Построй модель или A/B тест
+5. Интерпретируй результаты и дай рекомендации`,
+
+  data_engineer: `## Процедура построения data pipeline
+1. Определи источники и формат данных
+2. Спроектируй ETL/ELT пайплайн
+3. Реализуй с обработкой ошибок
+4. Настрой мониторинг и алертинг
+5. Задокументируй схему данных`,
+
+  ai_researcher: `## Процедура ML-исследования
+1. Изучи state-of-the-art по задаче
+2. Сформулируй гипотезу и baseline
+3. Проведи эксперименты с контролируемыми переменными
+4. Проанализируй результаты (метрики, ablation)
+5. Задокументируй findings и рекомендации`,
+
+  content_manager: `## Процедура контент-менеджмента
+1. Составь контент-план на месяц
+2. Определи темы и форматы по каналам
+3. Создай или закажи контент
+4. Опубликуй по расписанию
+5. Анализируй метрики и оптимизируй`,
+
+  smm: `## Процедура SMM
+1. Проанализируй аудиторию и конкурентов в соцсетях
+2. Составь контент-план с форматами
+3. Создай контент (текст + визуал)
+4. Запланируй публикации
+5. Модерируй комментарии и анализируй метрики`,
+
+  seo: `## Процедура SEO-оптимизации
+1. Проведи keyword research
+2. Проанализируй конкурентов в выдаче
+3. Оптимизируй on-page: title, meta, H1, content
+4. Настрой technical SEO: sitemap, robots, speed
+5. Построй link building стратегию`,
+
+  pr: `## Процедура PR-кампании
+1. Определи ключевые сообщения и аудиторию
+2. Составь медиа-лист
+3. Подготовь пресс-релиз или питч
+4. Проведи outreach к журналистам
+5. Мониторь упоминания и готовь отчёт`,
+
+  email_marketer: `## Процедура email-маркетинга
+1. Сегментируй базу подписчиков
+2. Создай email-последовательность
+3. Напиши тексты и подготовь шаблоны
+4. Настрой автоматизацию и триггеры
+5. A/B тестируй и оптимизируй open/click rate`,
+
+  sales_manager: `## Процедура продажи
+1. Квалифицируй лида (BANT/MEDDIC)
+2. Проведи discovery call
+3. Подготовь и презентуй коммерческое предложение
+4. Обработай возражения
+5. Закрой сделку и передай в onboarding`,
+
+  bdr: `## Процедура лидогенерации
+1. Определи ICP (Ideal Customer Profile)
+2. Составь список потенциальных клиентов
+3. Подготовь персонализированный outreach
+4. Проведи первый контакт (email/LinkedIn/звонок)
+5. Квалифицируй и передай в sales`,
+
+  account_manager: `## Процедура управления аккаунтом
+1. Проведи onboarding нового клиента
+2. Настрой regular check-ins
+3. Мониторь usage и satisfaction
+4. Предложи upsell/cross-sell при возможности
+5. Решай проблемы и управляй ожиданиями`,
+
+  partnerships: `## Процедура построения партнёрств
+1. Определи стратегические направления партнёрств
+2. Составь shortlist потенциальных партнёров
+3. Проведи переговоры и определи условия
+4. Подготовь партнёрское соглашение
+5. Запусти совместные активности и мониторь результат`,
+
+  ops_manager: `## Процедура операционного менеджмента
+1. Аудит текущих процессов
+2. Определи метрики эффективности
+3. Оптимизируй bottlenecks
+4. Автоматизируй рутинные операции
+5. Мониторь и отчитывайся по KPI`,
+
+  project_manager: `## Процедура управления проектом
+1. Определи scope, сроки, ресурсы
+2. Составь WBS и план проекта
+3. Назначь ответственных и зависимости
+4. Мониторь прогресс и риски
+5. Проводи ретроспективы`,
+
+  secretary: `## Процедура координации
+1. Управляй расписанием руководителя
+2. Организуй встречи и подготовь повестку
+3. Веди протоколы совещаний
+4. Контролируй исполнение поручений
+5. Поддерживай документооборот`,
+
+  office_manager: `## Процедура офис-менеджмента
+1. Обеспечь снабжение офиса
+2. Управляй подрядчиками и поставщиками
+3. Организуй рабочее пространство
+4. Координируй корпоративные мероприятия
+5. Контролируй административный бюджет`,
+
+  accountant: `## Процедура бухгалтерского учёта
+1. Веди первичную документацию
+2. Проводи банковские операции
+3. Подготовь налоговую отчётность
+4. Проведи сверку с контрагентами
+5. Подготовь управленческую отчётность`,
+
+  financial_analyst: `## Процедура финансового анализа
+1. Собери финансовые данные из всех источников
+2. Построй финансовую модель
+3. Проанализируй unit economics
+4. Подготовь прогноз и сценарии
+5. Подготовь отчёт с рекомендациями`,
+
+  hr_manager: `## Процедура HR-менеджмента
+1. Определи потребности в найме
+2. Создай описания вакансий
+3. Организуй процесс собеседований
+4. Проведи onboarding новых сотрудников
+5. Развивай культуру и проводи performance reviews`,
+
+  recruiter: `## Процедура рекрутинга
+1. Согласуй профиль кандидата с hiring manager
+2. Sourcing: LinkedIn, job boards, рефералы
+3. Screening: резюме, телефонное интервью
+4. Координируй техническое и финальное интервью
+5. Подготовь и согласуй оффер`,
+
+  lawyer: `## Процедура юридической поддержки
+1. Проанализируй юридические риски
+2. Подготовь или проверь договоры
+3. Обеспечь compliance (GDPR, privacy)
+4. Защити интеллектуальную собственность
+5. Консультируй команду по юридическим вопросам`,
+
+  support_manager: `## Процедура управления поддержкой
+1. Настрой каналы поддержки (чат, email, телефон)
+2. Создай базу знаний и FAQ
+3. Определи SLA и приоритеты тикетов
+4. Мониторь CSAT и время ответа
+5. Эскалируй критические проблемы`,
+
+  support_agent: `## Процедура обработки обращения
+1. Прими и классифицируй обращение
+2. Проверь базу знаний на готовое решение
+3. Реши проблему или эскалируй
+4. Задокументируй решение
+5. Запроси обратную связь у клиента`,
+
+  copywriter: `## Процедура создания продающего текста
+1. Изучи целевую аудиторию и предложение
+2. Сформулируй ключевое сообщение (UVP)
+3. Напиши варианты заголовков и текста
+4. A/B тестируй разные версии
+5. Оптимизируй по конверсии`,
+
+  video_producer: `## Процедура создания видео
+1. Определи цель и формат видео
+2. Напиши сценарий и раскадровку
+3. Организуй съёмку или запись экрана
+4. Смонтируй и добавь графику
+5. Опубликуй и проанализируй метрики`,
 }
+
+// Set up aliases for old → new ID SOPs
+ROLE_SOPS.backend = ROLE_SOPS.back
+ROLE_SOPS.frontend = ROLE_SOPS.front
+ROLE_SOPS.mobile = ROLE_SOPS.mob
+ROLE_SOPS.ml_eng = ROLE_SOPS.ml
+ROLE_SOPS.devops = ROLE_SOPS.ops
+ROLE_SOPS.designer = ROLE_SOPS.des
+ROLE_SOPS.marketer = ROLE_SOPS.mrk
+ROLE_SOPS.writer = ROLE_SOPS.wr
 
 // ── Default tools by role ───────────────────────────────────────────
 const DEFAULT_TOOLS = {
+  // Legacy IDs
   ceo: ['wiki', 'kanban', 'meeting', 'search'],
   cto: ['wiki', 'kanban', 'meeting', 'github', 'search'],
   back: ['wiki', 'kanban', 'github', 'search'],
@@ -257,6 +550,64 @@ const DEFAULT_TOOLS = {
   wr: ['wiki', 'kanban', 'search'],
   pm: ['wiki', 'kanban', 'meeting', 'search'],
   qa: ['wiki', 'kanban', 'github', 'search'],
+  // New IDs (aliases)
+  backend: ['wiki', 'kanban', 'github', 'search'],
+  frontend: ['wiki', 'kanban', 'github', 'search'],
+  fullstack: ['wiki', 'kanban', 'github', 'search'],
+  mobile: ['wiki', 'kanban', 'github', 'search'],
+  ml_eng: ['wiki', 'kanban', 'github', 'search'],
+  devops: ['wiki', 'kanban', 'github', 'search'],
+  designer: ['wiki', 'kanban', 'search'],
+  marketer: ['wiki', 'kanban', 'search'],
+  writer: ['wiki', 'kanban', 'search'],
+  security: ['wiki', 'kanban', 'github', 'search'],
+  tech_lead: ['wiki', 'kanban', 'meeting', 'github', 'search'],
+  // C-suite
+  coo: ['wiki', 'kanban', 'meeting', 'search'],
+  cfo: ['wiki', 'kanban', 'meeting', 'search'],
+  cmo: ['wiki', 'kanban', 'meeting', 'search'],
+  cpo: ['wiki', 'kanban', 'meeting', 'search'],
+  // Product
+  po: ['wiki', 'kanban', 'meeting', 'search'],
+  ba: ['wiki', 'kanban', 'search'],
+  ux_researcher: ['wiki', 'kanban', 'search'],
+  // Design
+  ux_designer: ['wiki', 'kanban', 'search'],
+  graphic_designer: ['wiki', 'kanban', 'search'],
+  motion_designer: ['wiki', 'kanban', 'search'],
+  // Data
+  data_scientist: ['wiki', 'kanban', 'github', 'search'],
+  data_engineer: ['wiki', 'kanban', 'github', 'search'],
+  ai_researcher: ['wiki', 'kanban', 'github', 'search'],
+  // Marketing
+  content_manager: ['wiki', 'kanban', 'search'],
+  smm: ['wiki', 'kanban', 'search'],
+  seo: ['wiki', 'kanban', 'search'],
+  pr: ['wiki', 'kanban', 'search'],
+  email_marketer: ['wiki', 'kanban', 'search'],
+  copywriter: ['wiki', 'kanban', 'search'],
+  video_producer: ['wiki', 'kanban', 'search'],
+  // Sales
+  sales_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  bdr: ['wiki', 'kanban', 'search'],
+  account_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  partnerships: ['wiki', 'kanban', 'meeting', 'search'],
+  // Operations
+  ops_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  project_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  secretary: ['wiki', 'kanban', 'search'],
+  office_manager: ['wiki', 'kanban', 'search'],
+  // Finance
+  accountant: ['wiki', 'kanban', 'search'],
+  financial_analyst: ['wiki', 'kanban', 'search'],
+  // HR
+  hr_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  recruiter: ['wiki', 'kanban', 'search'],
+  // Legal
+  lawyer: ['wiki', 'kanban', 'search'],
+  // Support
+  support_manager: ['wiki', 'kanban', 'meeting', 'search'],
+  support_agent: ['wiki', 'kanban', 'search'],
 }
 
 const TOOL_DESCRIPTIONS = {
@@ -333,7 +684,7 @@ ${proj.timeline ? `Сроки: ${proj.timeline}` : ''}
   }
 
   buildSOP(roleId) {
-    const sop = ROLE_SOPS[roleId]
+    const sop = ROLE_SOPS[roleId] || ROLE_SOPS[resolveRoleId(roleId)]
     if (!sop) return ''
     return `<sop>\n${sop}\n</sop>`
   }
@@ -371,7 +722,7 @@ ${proj.timeline ? `Сроки: ${proj.timeline}` : ''}
     const p = agent.personality || {}
     const roleId = agent.role || agent.id
     const skills = Array.isArray(p.skills) ? p.skills : (p.skills || '').split(',').map(s => s.trim()).filter(Boolean)
-    const tools = agent.tools || DEFAULT_TOOLS[roleId] || ['wiki', 'kanban', 'search']
+    const tools = agent.tools || DEFAULT_TOOLS[roleId] || DEFAULT_TOOLS[resolveRoleId(roleId)] || ['wiki', 'kanban', 'search']
     const customTools = agent.customTools || []
 
     let section = `<skills>\n`
@@ -535,7 +886,7 @@ export function processMemoryTags(responseText, agentRole, dispatch, getState) {
 
 // ── Get default tools for a role ────────────────────────────────────
 export function getDefaultTools(roleId) {
-  return DEFAULT_TOOLS[roleId] || ['wiki', 'kanban', 'search']
+  return DEFAULT_TOOLS[roleId] || DEFAULT_TOOLS[resolveRoleId(roleId)] || ['wiki', 'kanban', 'search']
 }
 
 // ── All available tools ─────────────────────────────────────────────

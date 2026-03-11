@@ -1,18 +1,18 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { DndContext, useDraggable, useDroppable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { Plus, UserPlus, X, Armchair, Users, Rocket, Settings, Lightbulb } from 'lucide-react'
-import { DESKS, PEOPLE, WORKSPACE_TABS } from '../data/constants'
+import { Plus, UserPlus, X, Users, Rocket, Settings, Lightbulb, ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { ROLES, DEPARTMENTS, ROLE_LEVELS, getRolesByDepartment, PEOPLE, WORKSPACE_TABS, DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import RoleIcon from './RoleIcon'
 import Avatar from './Avatar'
 import Button from './Button'
 import AgentConfigModal, { generateSystemPrompt } from './AgentConfigModal'
 
-/* ── Draggable palette item ─────────────────────────── */
-function DeskDrag({ desk, used }) {
+/* ── Draggable role item ─────────────────────────────── */
+function RoleDrag({ role, used }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `desk-${desk.id}`,
-    data: { type: 'desk', desk },
+    id: `desk-${role.id}`,
+    data: { type: 'desk', desk: role },
     disabled: used,
   })
 
@@ -21,7 +21,7 @@ function DeskDrag({ desk, used }) {
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--bd)] transition-all duration-150 ${
+      className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-[var(--bd)] transition-all duration-150 ${
         !used ? 'hover:border-[var(--bd2)] hover:shadow-sm' : ''
       }`}
       style={{
@@ -31,12 +31,17 @@ function DeskDrag({ desk, used }) {
       }}
     >
       <div
-        className="flex items-center justify-center rounded-lg w-8 h-8 shrink-0"
-        style={{ background: `${desk.color}18` }}
+        className="flex items-center justify-center rounded-md w-7 h-7 shrink-0"
+        style={{ background: `${role.color}18` }}
       >
-        <RoleIcon name={desk.iconName} size={16} color={desk.color} />
+        <RoleIcon name={role.iconName} size={14} color={role.color} />
       </div>
-      <span className="text-xs font-semibold truncate">{desk.label}</span>
+      <div className="min-w-0 flex-1">
+        <div className="text-[11px] font-semibold truncate">{role.label}</div>
+        {role.level && (
+          <div className="text-[9px] text-[var(--t3)] truncate">{role.level}</div>
+        )}
+      </div>
     </div>
   )
 }
@@ -131,6 +136,36 @@ function GridSlot({ index, entry, onRemove, onOpenConfig }) {
   )
 }
 
+/* ── Department section (collapsible) ─────────────────── */
+function DepartmentSection({ dept, roles, usedIds, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const count = roles.length
+  const usedCount = roles.filter(r => usedIds.has(r.id)).length
+
+  return (
+    <div className="mb-1">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-left bg-transparent border-none cursor-pointer hover:bg-[var(--bg3)] transition-colors"
+      >
+        <div className="flex items-center justify-center w-5 h-5 rounded shrink-0" style={{ background: `${dept.color}18` }}>
+          <RoleIcon name={dept.iconName} size={12} color={dept.color} />
+        </div>
+        <span className="text-[11px] font-bold text-[var(--t2)] flex-1 truncate">{dept.name}</span>
+        <span className="text-[9px] text-[var(--t3)] font-medium">{usedCount}/{count}</span>
+        {open ? <ChevronDown size={12} className="text-[var(--t3)]" /> : <ChevronRight size={12} className="text-[var(--t3)]" />}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-1 mt-1 pl-1">
+          {roles.map(role => (
+            <RoleDrag key={role.id} role={role} used={usedIds.has(role.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 /* ── Main Component ─────────────────────────────────── */
 export default function OfficeBuild({ project, onDone }) {
   const { state } = useApp()
@@ -138,11 +173,41 @@ export default function OfficeBuild({ project, onDone }) {
   const [placed, setPlaced] = useState([])
   const [configSlot, setConfigSlot] = useState(null)
   const [activeItem, setActiveItem] = useState(null)
+  const [search, setSearch] = useState('')
+  const [levelFilter, setLevelFilter] = useState('all')
   const initialized = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
+
+  // Filter roles by search + level
+  const filteredRoles = useMemo(() => {
+    let result = ROLES
+    if (search) {
+      const q = search.toLowerCase()
+      result = result.filter(r =>
+        r.label.toLowerCase().includes(q) ||
+        r.bio.toLowerCase().includes(q) ||
+        r.id.includes(q) ||
+        (r.defaultSkills || []).some(s => s.toLowerCase().includes(q))
+      )
+    }
+    if (levelFilter !== 'all') {
+      result = result.filter(r => r.level === levelFilter)
+    }
+    return result
+  }, [search, levelFilter])
+
+  // Group filtered roles by department
+  const groupedRoles = useMemo(() => {
+    const groups = []
+    for (const dept of DEPARTMENTS) {
+      const deptRoles = filteredRoles.filter(r => r.department === dept.id)
+      if (deptRoles.length > 0) groups.push({ dept, roles: deptRoles })
+    }
+    return groups
+  }, [filteredRoles])
 
   // Auto-place recommended team on mount
   useEffect(() => {
@@ -157,7 +222,7 @@ export default function OfficeBuild({ project, onDone }) {
     const autoPlaced = []
     let personIdx = 0
     teamComp.forEach((rec, i) => {
-      if (i >= 8) return // max 8 slots
+      if (i >= 12) return // max 12 slots
       const desk = DESKS.find(d => d.id === rec.role)
       if (!desk) return
       const person = PEOPLE[personIdx % PEOPLE.length]
@@ -277,6 +342,9 @@ export default function OfficeBuild({ project, onDone }) {
     return desk ? desk.label : r.role
   }).filter(Boolean)
 
+  // Dynamic grid: expand from 8 to 12 slots if needed
+  const slotCount = Math.max(8, Math.min(12, placed.length + 2))
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen flex flex-col p-6">
@@ -289,7 +357,7 @@ export default function OfficeBuild({ project, onDone }) {
             Собери команду «{project.name}»
           </h1>
           <p className="text-[var(--t2)] text-sm mt-1.5">
-            Перетащи стол → посади сотрудника → настрой
+            Перетащи роль → посади сотрудника → настрой
           </p>
         </div>
 
@@ -315,24 +383,78 @@ export default function OfficeBuild({ project, onDone }) {
 
         {/* Main area */}
         <div className="flex flex-1 gap-4 overflow-hidden">
-          {/* Sidebar: Palette */}
-          <div className="w-48 shrink-0 flex flex-col gap-2 overflow-auto pr-1">
-            <div className="flex items-center gap-2 text-xs font-bold text-[var(--t3)] uppercase tracking-wider mb-1">
-              <Armchair size={14} />
-              Столы
+          {/* Sidebar: Role Catalog */}
+          <div className="w-56 shrink-0 flex flex-col gap-1.5 overflow-hidden">
+            {/* Search */}
+            <div className="relative mb-1">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--t3)]" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Поиск ролей..."
+                className="w-full pl-8 pr-3 py-2 rounded-lg text-[11px] text-[var(--t)] bg-[var(--bg2)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors"
+              />
             </div>
-            {DESKS.map(desk => (
-              <DeskDrag key={desk.id} desk={desk} used={usedDeskIds.has(desk.id)} />
-            ))}
 
-            <div className="flex items-center gap-2 text-xs font-bold text-[var(--t3)] uppercase tracking-wider mt-3 mb-1">
-              <Users size={14} />
-              Люди
+            {/* Level filter */}
+            <div className="flex flex-wrap gap-1 mb-1">
+              <button
+                onClick={() => setLevelFilter('all')}
+                className={`px-2 py-1 rounded-md text-[10px] font-semibold cursor-pointer border transition-all ${
+                  levelFilter === 'all'
+                    ? 'bg-[var(--ac)] text-white border-[var(--ac)]'
+                    : 'bg-[var(--bg2)] text-[var(--t3)] border-[var(--bd)] hover:border-[var(--ac)]'
+                }`}
+              >
+                Все ({ROLES.length})
+              </button>
+              {ROLE_LEVELS.map(l => {
+                const count = ROLES.filter(r => r.level === l.id).length
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => setLevelFilter(l.id === levelFilter ? 'all' : l.id)}
+                    className={`px-2 py-1 rounded-md text-[10px] font-semibold cursor-pointer border transition-all ${
+                      levelFilter === l.id
+                        ? 'bg-[var(--ac)] text-white border-[var(--ac)]'
+                        : 'bg-[var(--bg2)] text-[var(--t3)] border-[var(--bd)] hover:border-[var(--ac)]'
+                    }`}
+                  >
+                    {l.label} ({count})
+                  </button>
+                )
+              })}
             </div>
-            <div className="flex flex-wrap gap-2">
-              {PEOPLE.map(person => (
-                <PersonDrag key={person.id} person={person} />
+
+            {/* Department groups */}
+            <div className="flex-1 overflow-y-auto pr-1">
+              {groupedRoles.map(({ dept, roles }) => (
+                <DepartmentSection
+                  key={dept.id}
+                  dept={dept}
+                  roles={roles}
+                  usedIds={usedDeskIds}
+                  defaultOpen={search.length > 0 || roles.some(r => usedDeskIds.has(r.id))}
+                />
               ))}
+              {groupedRoles.length === 0 && (
+                <div className="text-center text-[var(--t3)] text-xs py-4">
+                  Ничего не найдено
+                </div>
+              )}
+
+              {/* People section */}
+              <div className="mt-3 pt-3 border-t border-[var(--bd)]">
+                <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2 px-2">
+                  <Users size={12} />
+                  Люди
+                </div>
+                <div className="flex flex-wrap gap-2 px-2">
+                  {PEOPLE.map(person => (
+                    <PersonDrag key={person.id} person={person} />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -351,7 +473,7 @@ export default function OfficeBuild({ project, onDone }) {
             />
 
             <div className="grid grid-cols-4 gap-3 relative z-[1]">
-              {Array.from({ length: 8 }, (_, i) => (
+              {Array.from({ length: slotCount }, (_, i) => (
                 <GridSlot
                   key={i}
                   index={i}
