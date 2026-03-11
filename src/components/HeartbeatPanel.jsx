@@ -4,7 +4,10 @@ import { DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
 import { WatchdogEngine, incrementTaskCycles } from '../services/watchdog'
+import { CircuitBreaker } from '../services/circuitBreaker'
+import { MeetingEngine } from '../services/meetings'
 import { useNotify } from './Notifications'
+import EscalationModal from './EscalationModal'
 import RoleIcon from './RoleIcon'
 
 export default function HeartbeatPanel() {
@@ -17,6 +20,7 @@ export default function HeartbeatPanel() {
   const [summary, setSummary] = useState(null)
   const [expanded, setExpanded] = useState(false)
   const [autoTrigger, setAutoTrigger] = useState(false)
+  const [escalations, setEscalations] = useState([])
   const engineRef = useRef(null)
 
   // Lazily create engine with fresh state getter
@@ -59,6 +63,14 @@ export default function HeartbeatPanel() {
     // Run Watchdog health check after heartbeat cycle
     const watchdog = new WatchdogEngine(() => state, dispatch, notify)
     watchdog.run()
+
+    // Run Circuit Breaker checks
+    const meetingEngine = new MeetingEngine(() => state, dispatch)
+    const cb = new CircuitBreaker(() => state, dispatch, notify, meetingEngine)
+    const { escalations: newEscalations } = await cb.processAll()
+    if (newEscalations.length > 0) {
+      setEscalations(prev => [...prev, ...newEscalations])
+    }
   }, [running, getEngine, state, dispatch, notify])
 
   const handleStop = useCallback(() => {
@@ -238,6 +250,17 @@ export default function HeartbeatPanel() {
             })}
           </div>
         </div>
+      )}
+
+      {/* Escalation Modal */}
+      {escalations.length > 0 && (
+        <EscalationModal
+          escalations={escalations}
+          onResolve={(id) => {
+            setEscalations(prev => prev.filter(e => e.id !== id))
+          }}
+          onClose={() => setEscalations([])}
+        />
       )}
     </div>
   )

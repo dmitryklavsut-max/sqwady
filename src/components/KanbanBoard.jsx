@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { DndContext, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { Plus, X, Check, Trash2 } from 'lucide-react'
+import { Plus, X, Check, Trash2, Snowflake } from 'lucide-react'
 import { KANBAN_COLS, KANBAN_NAMES, KANBAN_COLORS, PRIORITY_COLORS, DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
@@ -17,9 +17,11 @@ function getInitials(name) {
 
 /* ── Draggable Task Card ───────────────────────────── */
 function TaskCard({ task, team, onClick, isInSprint }) {
+  const isFrozen = !!task.frozen
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
+    disabled: isFrozen,
   })
 
   const agent = team.find(t => (t.role || t.id) === task.assignee)
@@ -33,23 +35,28 @@ function TaskCard({ task, team, onClick, isInSprint }) {
       {...listeners}
       {...attributes}
       onClick={(e) => { e.stopPropagation(); onClick(task) }}
-      className={`rounded-xl cursor-grab border border-[var(--card-border)] bg-[var(--bg2)] transition-all duration-200 active:cursor-grabbing ${
-        isDragging ? 'opacity-40 scale-95' : 'hover:-translate-y-0.5 hover:border-[rgba(99,102,241,0.2)]'
+      className={`rounded-xl border border-[var(--card-border)] bg-[var(--bg2)] transition-all duration-200 ${
+        isFrozen ? 'opacity-50 cursor-default' : 'cursor-grab active:cursor-grabbing'
+      } ${
+        isDragging ? 'opacity-40 scale-95' : isFrozen ? '' : 'hover:-translate-y-0.5 hover:border-[rgba(99,102,241,0.2)]'
       }`}
       style={{
-        borderLeft: `3px solid ${PRIORITY_COLORS[task.priority] || '#94a3b8'}`,
+        borderLeft: `3px solid ${isFrozen ? '#38bdf8' : (PRIORITY_COLORS[task.priority] || '#94a3b8')}`,
         boxShadow: 'var(--card-shadow)',
         padding: 14,
       }}
     >
-      {/* ID + Priority */}
+      {/* ID + Priority + Frozen */}
       <div className="flex justify-between items-center mb-2">
-        <span className="text-[11px] text-[var(--t3)] font-mono font-medium">{task.id}</span>
+        <div className="flex items-center gap-1.5">
+          {isFrozen && <Snowflake size={12} className="text-sky-400" />}
+          <span className="text-[11px] text-[var(--t3)] font-mono font-medium">{task.id}</span>
+        </div>
         <span
           className="text-[11px] font-bold px-2 py-0.5 rounded-full"
           style={{ color: PRIORITY_COLORS[task.priority], background: (PRIORITY_COLORS[task.priority] || '#94a3b8') + '18' }}
         >
-          {task.priority}
+          {isFrozen ? '❄️' : task.priority}
         </span>
       </div>
       {/* Title */}
@@ -262,6 +269,23 @@ function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
           </div>
         </div>
 
+        {/* Frozen indicator + unfreeze */}
+        {!isNew && task.frozen && (
+          <div className="flex items-center justify-between mt-2 px-3 py-2 rounded-lg bg-sky-500/10 border border-sky-500/20">
+            <div className="flex items-center gap-2 text-[12px] text-sky-400 font-medium">
+              <Snowflake size={14} />
+              Задача заморожена
+            </div>
+            <button
+              onClick={() => onSave({ ...task, frozen: false, title: form.title.trim() || task.title, description: form.description.trim(), assignee: form.assignee, priority: form.priority, column: form.column, tags: form.tags.split(',').map(t => t.trim()).filter(Boolean), dueDate: form.dueDate || null })}
+              className="text-[11px] font-semibold text-sky-400 hover:text-sky-300 cursor-pointer bg-transparent border-none"
+              style={{ fontFamily: 'inherit' }}
+            >
+              Разморозить
+            </button>
+          </div>
+        )}
+
         <div className="flex justify-between mt-6">
           <div>
             {!isNew && (
@@ -358,6 +382,7 @@ export default function KanbanBoard({ team }) {
 
     const task = tasks.find(t => t.id === taskId)
     if (!task || task.column === newColumn) return
+    if (task.frozen) return // Cannot move frozen tasks
 
     // Track reassignCount when task moves backward (e.g. review→in_progress)
     const colOrder = KANBAN_COLS

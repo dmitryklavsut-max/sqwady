@@ -209,13 +209,13 @@ export class HeartbeatEngine {
     return this.getState()
   }
 
-  // Poll a single agent
+  // Poll a single agent (skip frozen tasks)
   async pollAgent(agent, onProgress) {
     const { tasks, project, memoryFiles, sprints, currentSprintId } = this.state
     const role = agent.role || agent.id
     const agentName = agent.personality?.name || agent.label
     const desk = DESKS.find(d => d.id === role)
-    const agentTasks = (tasks || []).filter(t => t.assignee === role)
+    const agentTasks = (tasks || []).filter(t => t.assignee === role && !t.frozen)
 
     // Build context for the heartbeat poll
     const tasksSummary = agentTasks.map(t =>
