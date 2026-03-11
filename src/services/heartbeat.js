@@ -1,6 +1,7 @@
 import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
 import { getDaysRemaining } from './sprintPlanner'
+import { TaskExecutor } from './taskExecutor'
 
 // ── Heartbeat system prompt for status polling ──────────────────
 const HEARTBEAT_SYSTEM_SUFFIX = `
@@ -203,6 +204,7 @@ export class HeartbeatEngine {
     this.dispatch = dispatch
     this._running = false
     this._aborted = false
+    this.taskExecutor = new TaskExecutor(getState, dispatch)
   }
 
   get state() {
@@ -411,9 +413,71 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       }
     }
 
-    // 5. Update PROGRESS.md
+    // 5. Task Execution Phase — agents pick up and execute To Do tasks
+    let tasksExecuted = 0
+    let tasksReviewed = 0
+
+    for (const agent of sorted) {
+      if (this._aborted) break
+
+      const role = agent.role || agent.id
+      const agentName = agent.personality?.name || agent.label
+
+      // Pick next task for this agent
+      const nextTask = this.taskExecutor.pickNextTask(role)
+      if (nextTask) {
+        if (onProgress) onProgress({ agentId: role, agentName, status: 'executing', taskId: nextTask.id })
+
+        try {
+          await this.taskExecutor.executeTask(nextTask, agent, onProgress)
+          tasksExecuted++
+        } catch (err) {
+          console.warn(`Task execution failed for ${agentName}:`, err.message)
+        }
+
+        if (!this._aborted) await new Promise(r => setTimeout(r, 500))
+      }
+    }
+
+    // 6. Review Phase — process tasks awaiting review
+    const reviewableTasks = this.taskExecutor.findReviewableTasks()
+    for (const { task: reviewTask, artifact } of reviewableTasks) {
+      if (this._aborted) break
+
+      const reviewerRole = reviewTask.reviewerRole
+      const reviewer = team.find(t => (t.role || t.id) === reviewerRole)
+      if (!reviewer || !artifact) continue
+
+      const reviewerName = reviewer.personality?.name || reviewer.label
+      if (onProgress) onProgress({ agentId: reviewerRole, agentName: reviewerName, status: 'reviewing', taskId: reviewTask.id })
+
+      try {
+        const reviewResult = await this.taskExecutor.reviewTask(reviewTask, reviewer, artifact, onProgress)
+        tasksReviewed++
+
+        // If approved, trigger chain reaction
+        if (reviewResult.verdict === 'APPROVED') {
+          tasksCompleted++
+          if (!this._aborted) {
+            const chain = await this.onTaskCompleted(reviewTask.id, onProgress)
+            if (chain) {
+              tasksCreated += chain.tasksCreated
+              tasksCompleted += chain.tasksCompleted
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`Review failed for task ${reviewTask.id}:`, err.message)
+      }
+
+      if (!this._aborted) await new Promise(r => setTimeout(r, 500))
+    }
+
+    // 7. Update PROGRESS.md
     const progressEntry = `## Цикл Heartbeat — ${new Date().toLocaleString('ru-RU')}
 Опрошено: ${results.length} агентов
+Задач выполнено: ${tasksExecuted}
+Задач на ревью: ${tasksReviewed}
 Завершено задач: ${tasksCompleted}
 Создано задач: ${tasksCreated}
 ${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')}
@@ -433,6 +497,8 @@ ${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')
       agentsPolled: results.length,
       tasksCompleted,
       tasksCreated,
+      tasksExecuted,
+      tasksReviewed,
       blockers: results.flatMap(r => r.blockers),
       results,
     }

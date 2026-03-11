@@ -15,6 +15,7 @@ const initialState = {
   economics: { months: [], revenue: [], costs: [], users: [] },
   pitchSlides: [],
   wikiPages: [],
+  artifacts: [],
   sprints: [],
   currentSprintId: null,
   watchdogIssues: [],
@@ -101,6 +102,15 @@ function reducer(state, action) {
           ...state.memoryFiles,
           [action.payload.key]: action.payload.value,
         },
+      }
+    case 'ADD_ARTIFACT':
+      return { ...state, artifacts: [...(state.artifacts || []), action.payload] }
+    case 'UPDATE_ARTIFACT':
+      return {
+        ...state,
+        artifacts: (state.artifacts || []).map((a) =>
+          a.id === action.payload.id ? { ...a, ...action.payload } : a
+        ),
       }
     case 'SET_SPRINTS':
       return { ...state, sprints: action.payload }
