@@ -7,6 +7,7 @@ import RoleIcon from '../components/RoleIcon'
 import AgentConfigModal from '../components/AgentConfigModal'
 import HeartbeatPanel from '../components/HeartbeatPanel'
 import SprintBar from '../components/SprintBar'
+import WatchdogIndicator from '../components/WatchdogIndicator'
 import ChatPanel from '../components/ChatPanel'
 import KanbanBoard from '../components/KanbanBoard'
 import RoadmapView from '../components/RoadmapView'
@@ -139,8 +140,10 @@ export default function Workspace({ project, team, onBackToHub }) {
             </div>
           )}
 
-          {/* Theme + collapse */}
+          {/* Watchdog + Theme + collapse */}
           <div className="px-2 pb-2 flex flex-col gap-1">
+            <WatchdogIndicator collapsed={collapsed} />
+
             <button
               onClick={toggleTheme}
               className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} w-full h-9 rounded-lg border-none cursor-pointer bg-transparent text-[var(--t3)] hover:text-[var(--t2)] hover:bg-[var(--bg3)] transition-colors duration-150 text-xs`}

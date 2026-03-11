@@ -3,11 +3,14 @@ import { Play, Square, ChevronDown, ChevronUp, Activity, CheckCircle, AlertTrian
 import { DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
+import { WatchdogEngine, incrementTaskCycles } from '../services/watchdog'
+import { useNotify } from './Notifications'
 import RoleIcon from './RoleIcon'
 
 export default function HeartbeatPanel() {
   const { state, dispatch } = useApp()
   const { team } = state
+  const notify = useNotify()
 
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState([]) // [{ agentId, agentName, status }]
@@ -33,6 +36,9 @@ export default function HeartbeatPanel() {
     setSummary(null)
     setExpanded(true)
 
+    // Increment cycle counters for stalled-task detection
+    incrementTaskCycles(state.tasks, dispatch)
+
     const engine = getEngine()
 
     const result = await engine.manualCycle((update) => {
@@ -49,7 +55,11 @@ export default function HeartbeatPanel() {
 
     setSummary(result)
     setRunning(false)
-  }, [running, getEngine])
+
+    // Run Watchdog health check after heartbeat cycle
+    const watchdog = new WatchdogEngine(() => state, dispatch, notify)
+    watchdog.run()
+  }, [running, getEngine, state, dispatch, notify])
 
   const handleStop = useCallback(() => {
     engineRef.current?.abort()

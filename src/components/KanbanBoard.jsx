@@ -4,6 +4,7 @@ import { Plus, X, Check, Trash2 } from 'lucide-react'
 import { KANBAN_COLS, KANBAN_NAMES, KANBAN_COLORS, PRIORITY_COLORS, DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
+import { resetTaskCycle } from '../services/watchdog'
 import { useNotify } from './Notifications'
 import Button from './Button'
 
@@ -358,7 +359,25 @@ export default function KanbanBoard({ team }) {
     const task = tasks.find(t => t.id === taskId)
     if (!task || task.column === newColumn) return
 
-    dispatch({ type: 'UPDATE_TASK', payload: { id: taskId, column: newColumn } })
+    // Track reassignCount when task moves backward (e.g. review→in_progress)
+    const colOrder = KANBAN_COLS
+    const oldIdx = colOrder.indexOf(task.column)
+    const newIdx = colOrder.indexOf(newColumn)
+    const updates = { id: taskId, column: newColumn }
+
+    if (newIdx < oldIdx) {
+      updates.reassignCount = (task.reassignCount || 0) + 1
+    }
+
+    // Track returnCount when moved back from done/review
+    if ((task.column === 'done' || task.column === 'review') && newIdx < oldIdx) {
+      updates.returnCount = (task.returnCount || 0) + 1
+    }
+
+    dispatch({ type: 'UPDATE_TASK', payload: updates })
+
+    // Reset stalled-task cycle counter on any column change
+    resetTaskCycle(taskId, dispatch)
 
     // Trigger chain reaction when task moved to done
     if (newColumn === 'done' && task.column !== 'done') {

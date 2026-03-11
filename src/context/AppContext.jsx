@@ -17,6 +17,7 @@ const initialState = {
   wikiPages: [],
   sprints: [],
   currentSprintId: null,
+  watchdogIssues: [],
   memoryFiles: {
     PROJECT: '',
     ARCHITECTURE: '',
@@ -114,6 +115,8 @@ function reducer(state, action) {
       }
     case 'SET_CURRENT_SPRINT':
       return { ...state, currentSprintId: action.payload }
+    case 'SET_WATCHDOG_ISSUES':
+      return { ...state, watchdogIssues: action.payload }
     case 'SET_RECOMMENDATIONS':
       return { ...state, recommendations: action.payload }
     case 'LOAD_PROJECT_STATE':
