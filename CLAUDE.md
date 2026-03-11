@@ -147,20 +147,43 @@ Defines WHO the agent is. AI recommends, user customizes.
 - Always push after commit: `git push origin main`
 - Test in browser after each phase
 
-## Current Release: v0.1 Core
-### Phase order:
-1. AppContext + localStorage
-2. ProjectSetup 3 screens
-3. AI Recommendations service + mock fallback
-4. AI Hints in ProjectSetup fields
-5. OfficeBuild + 2-layer agents + AI team recommendation
-6. Memory files generation + GenerationScreen
-7. Chat with AI agents (/task, @mentions)
-8. Kanban full CRUD + drag-drop
-9. Roadmap + Economics + Calendar
-10. Pitch + Wiki + final integration test
+## Completed Releases
 
-## Future Releases (do NOT implement yet)
-- v0.2: Heartbeat Engine, Watchdog, Circuit Breaker, Meeting Room
-- v0.3: Token Economics, dynamic hiring, pricing tiers
-- v0.4: Integration Router, external skills/agents, real people
+### v0.1 Core
+- AppContext + localStorage persistence
+- ProjectSetup 3 screens + AI hints
+- OfficeBuild 2-layer agents + AI team recommendation
+- Generation screen + workspace content
+- Chat with AI agents (/task, @mentions, role display)
+- Kanban full CRUD + drag-drop
+- Roadmap + Economics + Calendar (AI generated + editable)
+- Pitch + Wiki (AI generated + editable)
+- Memory files (5 project + 5 per agent)
+- ProjectsHub + TeamsHub (multi-project support)
+- Clickable agent profiles in sidebar
+
+### v0.2 Full Autonomy
+- Heartbeat Engine (manual + auto triggers, pause/resume)
+- Chain Reaction (task completion → dependent agents activated)
+- Sprint System (auto-planning from Roadmap, progress tracking)
+- Meeting Room (5 meeting types, multi-agent discussions, decisions log)
+- Watchdog (6 health checks, severity levels, auto-resolve)
+- Circuit Breaker (task limits, CEO arbitration, escalation modal, task freeze)
+- Real Task Execution (agents produce artifacts, auto-review pipeline)
+- Agent Plan Mode (execution plan + minute-based time estimates)
+- GitHub Integration (auto-commit artifacts, connection settings)
+- Claude Code Prompt Generator (for complex multi-file tasks)
+- Notifications system (toasts for events)
+
+## Current Release: v0.3 Economics (next)
+Phase order:
+18. Token Economics — agent salaries, project budget
+19. Dynamic Hiring — CEO initiates, user approves
+20. Budget optimization recommendations
+21. Pricing tiers integration (Free/Pro/Team)
+
+## Future: v0.4 Platform
+- Integration Router
+- External skills + sandbox
+- External agents (MCP, CrewAI)
+- Real people in team
