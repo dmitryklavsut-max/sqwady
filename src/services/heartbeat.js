@@ -1,5 +1,5 @@
 import { chatWithAgent } from './ai'
-import { DESKS, timestamp } from '../data/constants'
+import { DESKS, timestamp, resolveRoleId } from '../data/constants'
 import { getDaysRemaining } from './sprintPlanner'
 import { TaskExecutor } from './taskExecutor'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
@@ -117,11 +117,30 @@ function parseHeartbeatResponse(text, agentRole) {
   return result
 }
 
+// ── Build set of IDs that match an agent (handles legacy/new ID mismatch) ──
+const REVERSE_LEGACY = { backend: 'back', frontend: 'front', mobile: 'mob', ml_eng: 'ml', devops: 'ops', designer: 'des', marketer: 'mrk', writer: 'wr' }
+function buildAgentIds(role) {
+  const ids = new Set([role])
+  const resolved = resolveRoleId(role)
+  if (resolved !== role) ids.add(resolved)
+  if (REVERSE_LEGACY[role]) ids.add(REVERSE_LEGACY[role])
+  return ids
+}
+function isTaskForAgent(task, roleIds) {
+  if (!task.assignee) return false
+  const a = task.assignee.toLowerCase().trim()
+  for (const id of roleIds) {
+    if (a === id) return true
+  }
+  return false
+}
+
 // ── Mock fallback responses per role ─────────────────────────────
 function generateMockHeartbeat(agent, tasks, project) {
   const role = agent.role || agent.id
   const agentName = agent.personality?.name || agent.label
-  const agentTasks = tasks.filter(t => t.assignee === role)
+  const roleIds = buildAgentIds(role)
+  const agentTasks = tasks.filter(t => isTaskForAgent(t, roleIds))
   const inProgress = agentTasks.filter(t => t.column === 'in_progress')
   const todo = agentTasks.filter(t => t.column === 'todo')
   const review = agentTasks.filter(t => t.column === 'review')
@@ -223,7 +242,8 @@ export class HeartbeatEngine {
     const role = agent.role || agent.id
     const agentName = agent.personality?.name || agent.label
     const desk = DESKS.find(d => d.id === role)
-    const agentTasks = (tasks || []).filter(t => t.assignee === role && !t.frozen)
+    const roleIds = buildAgentIds(role)
+    const agentTasks = (tasks || []).filter(t => isTaskForAgent(t, roleIds) && !t.frozen)
 
     // Build context for the heartbeat poll
     const tasksSummary = agentTasks.map(t =>
@@ -407,7 +427,8 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
 
         if (!matched) {
           const completedLower = completed.toLowerCase()
-          const agentTasks = tasks.filter(t => t.assignee === role && t.column !== 'done')
+          const pollRoleIds = buildAgentIds(role)
+          const agentTasks = tasks.filter(t => isTaskForAgent(t, pollRoleIds) && t.column !== 'done')
           for (const t of agentTasks) {
             const titleWords = t.title.toLowerCase().split(/\s+/).filter(w => w.length > 3)
             const matchCount = titleWords.filter(w => completedLower.includes(w)).length
@@ -431,8 +452,14 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
           d.label.toLowerCase() === req.assignTo.toLowerCase()
         )
         if (matchDesk) assignee = matchDesk.id
-        const hasRole = team.some(t => (t.role || t.id) === assignee)
+        // Also try resolving legacy IDs (e.g., 'back' → 'backend')
+        const resolvedAssignee = resolveRoleId(assignee)
+        const hasRole = team.some(t => {
+          const tRole = t.role || t.id
+          return tRole === assignee || tRole === resolvedAssignee
+        })
         if (!hasRole) assignee = role
+        else if (resolvedAssignee !== assignee && team.some(t => (t.role || t.id) === resolvedAssignee)) assignee = resolvedAssignee
 
         this.dispatch({
           type: 'ADD_TASK',
@@ -628,8 +655,13 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
         let assignee = req.assignTo
         const matchDesk = DESKS.find(d => d.id === req.assignTo.toLowerCase() || d.label.toLowerCase() === req.assignTo.toLowerCase())
         if (matchDesk) assignee = matchDesk.id
-        const hasRole = team.some(t => (t.role || t.id) === assignee)
+        const chainResolved = resolveRoleId(assignee)
+        const hasRole = team.some(t => {
+          const tRole = t.role || t.id
+          return tRole === assignee || tRole === chainResolved
+        })
         if (!hasRole) assignee = role
+        else if (chainResolved !== assignee && team.some(t => (t.role || t.id) === chainResolved)) assignee = chainResolved
 
         this.dispatch({
           type: 'ADD_TASK',

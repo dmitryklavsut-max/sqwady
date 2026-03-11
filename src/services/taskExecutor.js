@@ -1,5 +1,5 @@
 import { chatWithAgent } from './ai'
-import { DESKS, timestamp } from '../data/constants'
+import { DESKS, timestamp, resolveRoleId } from '../data/constants'
 import { GitHubService, getArtifactFilePath, isComplexTask } from './github'
 import { generateClaudeCodePrompt } from './claudeCodePrompts'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
@@ -1340,23 +1340,62 @@ SCORE: {число от 1 до 10}`
     }
   }
 
+  // Build set of all IDs that match this agent role (handles legacy/new ID mismatch)
+  _buildRoleIds(agentRole) {
+    const ids = new Set([agentRole])
+    // Add resolved new ID (e.g., 'back' → 'backend')
+    const resolved = resolveRoleId(agentRole)
+    if (resolved !== agentRole) ids.add(resolved)
+    // Add reverse: if agentRole is a new ID, find old alias
+    // LEGACY_ID_MAP: back→backend, front→frontend, mob→mobile, ml→ml_eng, ops→devops, des→designer, mrk→marketer, wr→writer
+    const REVERSE_MAP = { backend: 'back', frontend: 'front', mobile: 'mob', ml_eng: 'ml', devops: 'ops', designer: 'des', marketer: 'mrk', writer: 'wr' }
+    if (REVERSE_MAP[agentRole]) ids.add(REVERSE_MAP[agentRole])
+    // Also add the agent label from DESKS (e.g., 'Backend Developer')
+    const desk = DESKS.find(d => d.id === agentRole)
+    if (desk?.label) ids.add(desk.label.toLowerCase())
+    // Also check team for personality name
+    const team = this.state.team || []
+    const agent = team.find(t => (t.role || t.id) === agentRole)
+    if (agent?.personality?.name) ids.add(agent.personality.name.toLowerCase())
+    if (agent?.label) ids.add(agent.label.toLowerCase())
+    return ids
+  }
+
+  // Check if a task is assigned to the given agent (handles all ID formats)
+  _isTaskForAgent(task, roleIds) {
+    if (!task.assignee) return false
+    const assignee = task.assignee.toLowerCase().trim()
+    for (const id of roleIds) {
+      if (assignee === id) return true
+    }
+    return false
+  }
+
   // Find the next task for an agent to work on
   // Priority: in_progress first (continue work), then todo by priority
   pickNextTask(agentRole) {
     const tasks = this.state.tasks || []
     const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 }
 
-    const allForAgent = tasks.filter(t => t.assignee === agentRole)
+    const roleIds = this._buildRoleIds(agentRole)
+    console.log(`pickNextTask for role: ${agentRole} | matching IDs: [${[...roleIds].join(', ')}]`)
+
+    const allForAgent = tasks.filter(t => this._isTaskForAgent(t, roleIds))
     const todoCount = allForAgent.filter(t => t.column === 'todo' && !t.frozen).length
     const ipCount = allForAgent.filter(t => t.column === 'in_progress' && !t.frozen).length
     const reviewCount = allForAgent.filter(t => t.column === 'review').length
     const doneCount = allForAgent.filter(t => t.column === 'done').length
     const frozenCount = allForAgent.filter(t => t.frozen).length
     console.log(`pickNextTask for role: ${agentRole} | total: ${allForAgent.length} | todo: ${todoCount}, in_progress: ${ipCount}, review: ${reviewCount}, done: ${doneCount}, frozen: ${frozenCount}`)
+    if (allForAgent.length === 0) {
+      // Debug: log a sample of task assignees to diagnose mismatches
+      const sample = tasks.slice(0, 5).map(t => `${t.id}:assignee="${t.assignee}"`)
+      console.log(`pickNextTask DEBUG: no tasks matched. Sample assignees: [${sample.join(', ')}]`)
+    }
 
     // First: continue in_progress tasks (already started, needs to finish)
-    const inProgress = tasks
-      .filter(t => t.assignee === agentRole && t.column === 'in_progress' && !t.frozen)
+    const inProgress = allForAgent
+      .filter(t => t.column === 'in_progress' && !t.frozen)
       .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
     if (inProgress.length > 0) {
       console.log(`pickNextTask for role: ${agentRole} found in_progress: ${inProgress[0].id} "${inProgress[0].title}"`)
@@ -1364,8 +1403,8 @@ SCORE: {число от 1 до 10}`
     }
 
     // Second: pick from todo by priority
-    const todo = tasks
-      .filter(t => t.assignee === agentRole && t.column === 'todo' && !t.frozen)
+    const todo = allForAgent
+      .filter(t => t.column === 'todo' && !t.frozen)
       .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
 
     const picked = todo[0] || null

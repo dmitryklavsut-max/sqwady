@@ -1,4 +1,4 @@
-import { DESKS } from '../data/constants.js'
+import { DESKS, resolveRoleId } from '../data/constants.js'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
 
 // ─── Anthropic API config ───────────────────────────────────────────
@@ -230,7 +230,10 @@ function generateFallbackWorkspace(project, team) {
   const teamRoles = team.map(t => t.role || t.id)
   const getAssignee = (preferred) => {
     for (const r of preferred) {
+      // Try exact match first, then resolved ID (back→backend, etc.)
       if (teamRoles.includes(r)) return r
+      const resolved = resolveRoleId(r)
+      if (resolved !== r && teamRoles.includes(resolved)) return resolved
     }
     return teamRoles[0] || 'cto'
   }
