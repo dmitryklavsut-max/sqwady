@@ -5,6 +5,7 @@ import { useTheme } from '../hooks/useTheme'
 import { useApp } from '../context/AppContext'
 import RoleIcon from '../components/RoleIcon'
 import AgentConfigModal from '../components/AgentConfigModal'
+import HeartbeatPanel from '../components/HeartbeatPanel'
 import ChatPanel from '../components/ChatPanel'
 import KanbanBoard from '../components/KanbanBoard'
 import RoadmapView from '../components/RoadmapView'
@@ -162,9 +163,12 @@ export default function Workspace({ project, team, onBackToHub }) {
       </aside>
 
       {/* ── Main content ───────────────────────────────── */}
-      <main className="flex-1 flex overflow-hidden bg-[var(--bg)]">
-        {renderTab()}
-      </main>
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <HeartbeatPanel />
+        <main className="flex-1 flex overflow-hidden bg-[var(--bg)]">
+          {renderTab()}
+        </main>
+      </div>
 
       {/* Agent profile modal */}
       {configAgent && (
