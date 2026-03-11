@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { DndContext, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { Plus, X, Check, Trash2 } from 'lucide-react'
 import { KANBAN_COLS, KANBAN_NAMES, KANBAN_COLORS, PRIORITY_COLORS, DESKS } from '../data/constants'
@@ -15,7 +15,7 @@ function getInitials(name) {
 }
 
 /* ── Draggable Task Card ───────────────────────────── */
-function TaskCard({ task, team, onClick }) {
+function TaskCard({ task, team, onClick, isInSprint }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
@@ -58,9 +58,14 @@ function TaskCard({ task, team, onClick }) {
         <div className="text-[11px] text-[var(--t3)] mb-2 line-clamp-2 leading-relaxed">{task.description}</div>
       )}
       {/* Tags */}
-      {task.tags?.length > 0 && (
+      {(task.tags?.length > 0 || isInSprint) && (
         <div className="flex flex-wrap gap-1 mb-2">
-          {task.tags.map(tag => (
+          {isInSprint && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--ac)' }}>
+              sprint
+            </span>
+          )}
+          {(task.tags || []).map(tag => (
             <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg3)] text-[var(--t3)] font-medium">
               {tag}
             </span>
@@ -89,7 +94,7 @@ function TaskCard({ task, team, onClick }) {
 }
 
 /* ── Droppable Column ──────────────────────────────── */
-function Column({ colId, tasks, team, onClickTask }) {
+function Column({ colId, tasks, team, onClickTask, sprintTaskIds }) {
   const { isOver, setNodeRef } = useDroppable({ id: colId })
 
   return (
@@ -113,7 +118,7 @@ function Column({ colId, tasks, team, onClickTask }) {
       {/* Cards */}
       <div className="flex-1 overflow-y-auto space-y-2.5 px-0.5">
         {tasks.map(task => (
-          <TaskCard key={task.id} task={task} team={team} onClick={onClickTask} />
+          <TaskCard key={task.id} task={task} team={team} onClick={onClickTask} isInSprint={sprintTaskIds.has(task.id)} />
         ))}
         {tasks.length === 0 && (
           <div className="flex items-center justify-center border-2 border-dashed border-[var(--bd)] rounded-lg min-h-[70px] text-[12px] text-[var(--t3)]">
@@ -289,6 +294,12 @@ export default function KanbanBoard({ team }) {
   const [filter, setFilter] = useState('all')
   const [activeTask, setActiveTask] = useState(null)
 
+  // Current sprint task IDs for badge
+  const sprintTaskIds = useMemo(() => {
+    const sprint = (state.sprints || []).find(s => s.id === state.currentSprintId)
+    return new Set(sprint?.taskIds || [])
+  }, [state.sprints, state.currentSprintId])
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   )
@@ -423,6 +434,7 @@ export default function KanbanBoard({ team }) {
               tasks={filtered.filter(t => t.column === colId)}
               team={team}
               onClickTask={openEdit}
+              sprintTaskIds={sprintTaskIds}
             />
           ))}
         </div>

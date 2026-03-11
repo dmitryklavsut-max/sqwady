@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Map, X, Check } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Map, X, Check, Zap } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import Button from './Button'
 
@@ -8,8 +8,16 @@ const inputClass = 'w-full px-3 py-2 rounded-lg text-sm text-[var(--t)] bg-[var(
 export default function RoadmapView() {
   const { state, dispatch } = useApp()
   const roadmap = state.roadmap || []
+  const sprints = state.sprints || []
+  const currentSprintId = state.currentSprintId
   const [hover, setHover] = useState(null)
   const [editing, setEditing] = useState(null) // index
+
+  // Current sprint date range for overlay
+  const currentSprint = useMemo(
+    () => sprints.find(s => s.id === currentSprintId),
+    [sprints, currentSprintId]
+  )
 
   const months = Array.from({ length: 12 }, (_, i) => `Мес ${i + 1}`)
 
@@ -98,6 +106,37 @@ export default function RoadmapView() {
         >
           <div className="h-full" style={{ borderLeft: '2px dashed var(--ac)' }} />
         </div>
+
+        {/* Current sprint overlay */}
+        {currentSprint && (() => {
+          const sprintStart = new Date(currentSprint.startDate)
+          const sprintEnd = new Date(currentSprint.endDate)
+          const timelineStart = new Date()
+          timelineStart.setHours(0, 0, 0, 0)
+          // Timeline spans 12 months from ~now
+          const totalMs = 12 * 30 * 24 * 60 * 60 * 1000
+          const startPct = Math.max(0, ((sprintStart - timelineStart) / totalMs) * 100)
+          const widthPct = Math.max(1, ((sprintEnd - sprintStart) / totalMs) * 100)
+          return (
+            <div
+              className="absolute pointer-events-none z-[5]"
+              style={{
+                left: `${startPct}%`,
+                width: `${widthPct}%`,
+                top: 38,
+                bottom: 0,
+                background: 'rgba(99,102,241,0.06)',
+                borderLeft: '2px solid rgba(99,102,241,0.3)',
+                borderRight: '2px solid rgba(99,102,241,0.3)',
+              }}
+            >
+              <div className="absolute -top-5 left-1 flex items-center gap-1 text-[10px] font-bold text-[var(--ac)]">
+                <Zap size={10} />
+                Спринт
+              </div>
+            </div>
+          )
+        })()}
 
         {roadmap.length === 0 && (
           <div className="text-center text-[var(--t3)] py-12">

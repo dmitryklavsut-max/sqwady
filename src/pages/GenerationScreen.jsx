@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { generateWorkspaceContent } from '../services/ai'
+import { generateSprints } from '../services/sprintPlanner'
 import { Loader2, Check, Rocket } from 'lucide-react'
 
 const STEPS = [
@@ -8,6 +9,7 @@ const STEPS = [
   'Настройка AI-агентов...',
   'Генерация задач...',
   'Подготовка roadmap...',
+  'Планирование спринтов...',
   'Генерация pitch-деки...',
   'Наполнение базы знаний...',
   'Готово! Запускаем workspace...',
@@ -29,6 +31,12 @@ export default function GenerationScreen({ onDone }) {
       .then((data) => {
         if (data.tasks) dispatch({ type: 'SET_TASKS', payload: data.tasks })
         if (data.roadmap) dispatch({ type: 'SET_ROADMAP', payload: data.roadmap })
+        // Generate sprints from roadmap + tasks
+        if (data.roadmap && data.tasks) {
+          const { sprints, currentSprintId } = generateSprints(data.roadmap, data.tasks, state.team)
+          dispatch({ type: 'SET_SPRINTS', payload: sprints })
+          dispatch({ type: 'SET_CURRENT_SPRINT', payload: currentSprintId })
+        }
         if (data.economics) dispatch({ type: 'SET_ECONOMICS', payload: data.economics })
         if (data.pitchSlides) dispatch({ type: 'SET_PITCH_SLIDES', payload: data.pitchSlides })
         if (data.wikiPages) dispatch({ type: 'SET_WIKI_PAGES', payload: data.wikiPages })

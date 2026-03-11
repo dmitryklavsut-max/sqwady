@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
-import { Send, Clipboard, Hash } from 'lucide-react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Send, Clipboard, Hash, Users, ChevronDown, ChevronRight, CheckCircle } from 'lucide-react'
 import { CHANNELS, DESKS, timestamp } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { chatWithAgent } from '../services/ai'
-import Avatar from './Avatar'
+import MeetingControls from './MeetingControls'
 import Button from './Button'
 
 // Channel → preferred responder roles
@@ -37,6 +37,121 @@ function renderMessageText(text, team) {
   })
 }
 
+// ── Render markdown-like bold ──────────────────────────────
+function renderBoldText(text) {
+  if (!text || typeof text !== 'string') return text
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-bold text-[var(--t)]">{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
+}
+
+// ── Meeting Thread Component ───────────────────────────────
+function MeetingThread({ messages, team, agentByRole }) {
+  const [collapsed, setCollapsed] = useState(false)
+
+  if (messages.length === 0) return null
+
+  const startMsg = messages.find(m => m.meetingStart)
+  const summaryMsg = messages.find(m => m.meetingSummary)
+  const speakerMsgs = messages.filter(m => !m.meetingStart && !m.meetingSummary && m.from !== 'system')
+
+  const meetingType = startMsg?.meetingType || 'standup'
+  const participantRoles = [...new Set(speakerMsgs.map(m => m.from))]
+
+  return (
+    <div className="mx-4 my-3 rounded-xl border border-[var(--card-border)] bg-[var(--bg2)] overflow-hidden">
+      {/* Thread header */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="flex items-center gap-2.5 w-full px-4 py-3 bg-transparent border-none cursor-pointer text-left hover:bg-[var(--bg3)] transition-colors"
+        style={{ fontFamily: 'inherit' }}
+      >
+        {collapsed ? <ChevronRight size={14} className="text-[var(--t3)]" /> : <ChevronDown size={14} className="text-[var(--t3)]" />}
+        <span className="text-[13px] font-bold text-[var(--t)]">
+          {startMsg ? renderBoldText(startMsg.text.split('\n')[0]) : 'Митинг'}
+        </span>
+        <span className="text-[11px] text-[var(--t3)] ml-1">{startMsg?.time}</span>
+
+        {/* Participant avatars */}
+        <div className="flex items-center ml-auto -space-x-1.5">
+          {participantRoles.slice(0, 5).map(role => {
+            const agent = agentByRole[role]
+            const desk = DESKS.find(d => d.id === role)
+            const name = agent?.personality?.name || agent?.label || role
+            const color = desk?.color || agent?.color || '#888'
+            return (
+              <div
+                key={role}
+                className="flex items-center justify-center rounded-full font-bold text-[8px] select-none border-2 border-[var(--bg2)]"
+                style={{ width: 22, height: 22, background: `${color}22`, color }}
+                title={name}
+              >
+                {getInitials(name)}
+              </div>
+            )
+          })}
+          {participantRoles.length > 5 && (
+            <span className="text-[10px] text-[var(--t3)] ml-2">+{participantRoles.length - 5}</span>
+          )}
+        </div>
+      </button>
+
+      {/* Thread body */}
+      {!collapsed && (
+        <div className="border-t border-[var(--card-border)]">
+          {/* Speaker messages */}
+          {speakerMsgs.map(m => {
+            const agent = agentByRole[m.from]
+            const desk = DESKS.find(d => d.id === m.from)
+            const displayName = m.name || agent?.personality?.name || agent?.label || m.from
+            const color = desk?.color || agent?.color || '#888'
+
+            return (
+              <div key={m.id} className="flex gap-3 px-4 py-2.5 hover:bg-[var(--bg3)] transition-colors duration-100">
+                <div className="shrink-0 mt-0.5">
+                  <div
+                    className="flex items-center justify-center rounded-full font-bold select-none"
+                    style={{ width: 28, height: 28, background: `${color}22`, color, fontSize: 10 }}
+                  >
+                    {getInitials(displayName)}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-bold text-[13px]" style={{ color }}>{displayName}</span>
+                    {desk && <span className="text-[11px] text-[var(--t3)]">{desk.label}</span>}
+                    <span className="text-[11px] text-[var(--t3)] ml-auto">{m.time}</span>
+                  </div>
+                  <div className="text-[13px] text-[var(--t2)] mt-0.5 whitespace-pre-wrap" style={{ lineHeight: 1.6 }}>
+                    {renderBoldText(m.text)}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+
+          {/* Summary block */}
+          {summaryMsg && (
+            <div className="border-t border-[var(--card-border)] px-4 py-3 bg-[rgba(99,102,241,0.04)]">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle size={14} className="text-[var(--ac)]" />
+                <span className="text-[12px] font-bold text-[var(--ac)] uppercase tracking-wider">Итоги</span>
+              </div>
+              <div className="text-[13px] text-[var(--t2)] whitespace-pre-wrap" style={{ lineHeight: 1.7 }}>
+                {renderBoldText(summaryMsg.text)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ChatPanel() {
   const { state, dispatch } = useApp()
   const { project, team, messages, tasks, memoryFiles } = state
@@ -45,6 +160,7 @@ export default function ChatPanel() {
   const [inp, setInp] = useState('')
   const [typing, setTyping] = useState(null) // { name, role }
   const [readChannels, setReadChannels] = useState(() => new Set(['general']))
+  const [showMeetingModal, setShowMeetingModal] = useState(false)
   const endRef = useRef(null)
 
   // Build agent lookup
@@ -79,6 +195,56 @@ export default function ChatPanel() {
   }
 
   const channelMessages = messages[ch] || []
+
+  // Group meeting messages into threads for meeting channel
+  const meetingThreads = useMemo(() => {
+    if (ch !== 'meeting') return null
+    const meetingMsgs = messages.meeting || []
+    const threads = []
+    const nonMeetingMsgs = []
+    const threadMap = {}
+
+    for (const msg of meetingMsgs) {
+      if (msg.meetingId) {
+        if (!threadMap[msg.meetingId]) {
+          threadMap[msg.meetingId] = []
+          threads.push({ meetingId: msg.meetingId, messages: threadMap[msg.meetingId] })
+        }
+        threadMap[msg.meetingId].push(msg)
+      } else {
+        // Non-meeting messages (heartbeat updates, etc.)
+        nonMeetingMsgs.push(msg)
+      }
+    }
+
+    // Interleave: show messages in chronological order, grouping meeting threads
+    const result = []
+    let meetingIdx = 0
+    let regularIdx = 0
+    const threadStartTimes = threads.map(t => {
+      const first = t.messages[0]
+      return first ? (first.meetingStart ? first : t.messages[0]) : null
+    })
+
+    // Simple approach: all non-meeting messages first, then meeting threads by order
+    // Actually let's keep chronological: place threads at position of their start message
+    const allItems = []
+    const usedMeetings = new Set()
+
+    for (const msg of meetingMsgs) {
+      if (msg.meetingId) {
+        if (!usedMeetings.has(msg.meetingId)) {
+          usedMeetings.add(msg.meetingId)
+          allItems.push({ type: 'thread', meetingId: msg.meetingId, messages: threadMap[msg.meetingId] })
+        }
+        // Skip individual meeting messages — they're in the thread
+      } else {
+        allItems.push({ type: 'message', msg })
+      }
+    }
+
+    return allItems
+  }, [ch, messages])
 
   // Find which agent should respond
   const pickResponder = (userMessage) => {
@@ -196,6 +362,65 @@ export default function ChatPanel() {
   }
 
   const showTaskHint = inp.startsWith('/task')
+  const isMeetingChannel = ch === 'meeting'
+
+  // Render a single regular message
+  const renderMessage = (m) => {
+    const isUser = m.from === 'user'
+    const isSystem = m.from === 'system'
+    const agent = !isUser && !isSystem ? agentByRole[m.from] : null
+    const desk = !isUser && !isSystem ? getDeskForRole(m.from) : null
+    const displayName = isUser ? 'Вы' : (m.name || agent?.personality?.name || agent?.label || m.from)
+    const color = isUser ? 'var(--ac)' : isSystem ? 'var(--t3)' : (desk?.color || agent?.color || '#888')
+    const initials = isUser ? 'Вы' : isSystem ? '📋' : getInitials(displayName)
+
+    return (
+      <div
+        key={m.id}
+        className="flex gap-3 px-6 py-2 hover:bg-[var(--bg3)] transition-colors duration-100 group"
+      >
+        <div className="shrink-0 mt-1">
+          <div
+            className="flex items-center justify-center rounded-full font-bold select-none"
+            style={{
+              width: 36,
+              height: 36,
+              background: isUser ? 'var(--ac2)' : isSystem ? 'var(--bg3)' : `${color}22`,
+              color: isUser ? 'white' : color,
+              fontSize: 13,
+            }}
+          >
+            {initials}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline gap-2">
+            <span className="font-bold text-sm" style={{ color }}>
+              {displayName}
+            </span>
+            {!isUser && !isSystem && desk && (
+              <span className="text-[12px] text-[var(--t3)]"> · {desk.label}</span>
+            )}
+            <span className="text-xs text-[var(--t3)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
+              {m.time}
+            </span>
+          </div>
+          <div className="text-sm text-[var(--t2)] mt-0.5 whitespace-pre-wrap" style={{ lineHeight: 1.6 }}>
+            {renderBoldText(renderMessageText(m.text, team))}
+          </div>
+          {m.task && (
+            <div
+              className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--ac)]"
+              style={{ background: 'rgba(99,102,241,0.1)' }}
+            >
+              <Clipboard size={13} />
+              {m.task}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full overflow-hidden w-full">
@@ -263,6 +488,15 @@ export default function ChatPanel() {
           <Hash size={16} className="text-[var(--t3)]" />
           <span className="text-lg font-semibold">{CHANNELS[ch]?.name}</span>
           <span className="text-xs text-[var(--t3)] ml-2">{team.length} участников</span>
+          {isMeetingChannel && (
+            <Button
+              onClick={() => setShowMeetingModal(true)}
+              small
+              className="ml-auto"
+            >
+              <Users size={14} /> Созвать митинг
+            </Button>
+          )}
         </header>
 
         {/* Message feed */}
@@ -274,61 +508,29 @@ export default function ChatPanel() {
               <p className="text-xs mt-1">Начните общение в #{CHANNELS[ch]?.name}</p>
             </div>
           )}
-          {channelMessages.map((m) => {
-            const isUser = m.from === 'user'
-            const agent = !isUser ? agentByRole[m.from] : null
-            const desk = !isUser ? getDeskForRole(m.from) : null
-            const displayName = isUser ? 'Вы' : (m.name || agent?.personality?.name || agent?.label || m.from)
-            const color = isUser ? 'var(--ac)' : (desk?.color || agent?.color || '#888')
-            const initials = isUser ? 'Вы' : getInitials(displayName)
 
-            return (
-              <div
-                key={m.id}
-                className="flex gap-3 px-6 py-2 hover:bg-[var(--bg3)] transition-colors duration-100 group"
-              >
-                <div className="shrink-0 mt-1">
-                  <div
-                    className="flex items-center justify-center rounded-full font-bold select-none"
-                    style={{
-                      width: 36,
-                      height: 36,
-                      background: isUser ? 'var(--ac2)' : `${color}22`,
-                      color: isUser ? 'white' : color,
-                      fontSize: 13,
-                    }}
-                  >
-                    {initials}
-                  </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <span className="font-bold text-sm" style={{ color }}>
-                      {displayName}
-                    </span>
-                    {!isUser && desk && (
-                      <span className="text-[12px] text-[var(--t3)]"> · {desk.label}</span>
-                    )}
-                    <span className="text-xs text-[var(--t3)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity">
-                      {m.time}
-                    </span>
-                  </div>
-                  <div className="text-sm text-[var(--t2)] mt-0.5 whitespace-pre-wrap" style={{ lineHeight: 1.6 }}>
-                    {renderMessageText(m.text, team)}
-                  </div>
-                  {m.task && (
-                    <div
-                      className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--ac)]"
-                      style={{ background: 'rgba(99,102,241,0.1)' }}
-                    >
-                      <Clipboard size={13} />
-                      {m.task}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          {/* Meeting channel: render threads */}
+          {isMeetingChannel && meetingThreads ? (
+            <>
+              {meetingThreads.map((item, idx) => {
+                if (item.type === 'thread') {
+                  return (
+                    <MeetingThread
+                      key={item.meetingId}
+                      messages={item.messages}
+                      team={team}
+                      agentByRole={agentByRole}
+                    />
+                  )
+                }
+                // Regular message
+                return renderMessage(item.msg)
+              })}
+            </>
+          ) : (
+            // Regular channel
+            channelMessages.map(renderMessage)
+          )}
 
           {/* Typing indicator */}
           {typing && (
@@ -384,6 +586,11 @@ export default function ChatPanel() {
           </div>
         </div>
       </section>
+
+      {/* Meeting modal */}
+      {showMeetingModal && (
+        <MeetingControls onClose={() => setShowMeetingModal(false)} />
+      )}
     </div>
   )
 }

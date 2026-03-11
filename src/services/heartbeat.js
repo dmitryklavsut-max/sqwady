@@ -1,5 +1,6 @@
 import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
+import { getDaysRemaining } from './sprintPlanner'
 
 // ── Heartbeat system prompt for status polling ──────────────────
 const HEARTBEAT_SYSTEM_SUFFIX = `
@@ -210,7 +211,7 @@ export class HeartbeatEngine {
 
   // Poll a single agent
   async pollAgent(agent, onProgress) {
-    const { tasks, project, memoryFiles } = this.state
+    const { tasks, project, memoryFiles, sprints, currentSprintId } = this.state
     const role = agent.role || agent.id
     const agentName = agent.personality?.name || agent.label
     const desk = DESKS.find(d => d.id === role)
@@ -221,12 +222,20 @@ export class HeartbeatEngine {
       `${t.id}: "${t.title}" [${t.column}] (${t.priority})`
     ).join('\n') || 'Нет назначенных задач'
 
+    // Sprint context
+    let sprintContext = ''
+    const currentSprint = (sprints || []).find(s => s.id === currentSprintId)
+    if (currentSprint) {
+      const days = getDaysRemaining(currentSprint)
+      sprintContext = `\nТекущий спринт: ${currentSprint.name}. Цель: ${currentSprint.goal}. Осталось ${days} дней.`
+    }
+
     const heartbeatPrompt = `Дай статус-отчёт по своим задачам.
 
 Твои текущие задачи:
 ${tasksSummary}
 
-Общий контекст проекта: ${project?.name || 'Проект'}, стадия: ${project?.stage || 'MVP'}.
+Общий контекст проекта: ${project?.name || 'Проект'}, стадия: ${project?.stage || 'MVP'}.${sprintContext}
 ${HEARTBEAT_SYSTEM_SUFFIX}`
 
     // Build context for chatWithAgent
@@ -468,8 +477,17 @@ ${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')
       const agentName = agent.personality?.name || agent.label
       const desk = DESKS.find(d => d.id === role)
 
+      // Sprint context for chain
+      let chainSprintCtx = ''
+      const { sprints: chainSprints, currentSprintId: chainSprintId } = this.state
+      const chainSprint = (chainSprints || []).find(s => s.id === chainSprintId)
+      if (chainSprint) {
+        const days = getDaysRemaining(chainSprint)
+        chainSprintCtx = `\nТекущий спринт: ${chainSprint.name}. Цель: ${chainSprint.goal}. Осталось ${days} дней.`
+      }
+
       // Contextual heartbeat prompt with chain context
-      const chainPrompt = `Задача "${task.title}" (${task.id}) завершена ${completedName} (${completedDesk?.label || completedRole}). Результат доступен.
+      const chainPrompt = `Задача "${task.title}" (${task.id}) завершена ${completedName} (${completedDesk?.label || completedRole}). Результат доступен.${chainSprintCtx}
 
 Какие твои следующие шаги? Есть ли задачи, которые теперь можно начать или завершить?
 ${HEARTBEAT_SYSTEM_SUFFIX}`
