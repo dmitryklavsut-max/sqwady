@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { X, Check, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react'
+import { X, Check, ChevronDown, ChevronUp, Lightbulb, Wrench } from 'lucide-react'
 import { DESKS, MODELS, WORKSPACE_TABS } from '../data/constants'
+import { AVAILABLE_TOOLS, TOOL_DESCRIPTIONS, getDefaultTools } from '../services/promptBuilder'
 import RoleIcon from './RoleIcon'
 import Avatar from './Avatar'
 import Button from './Button'
@@ -67,6 +68,8 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
   })
 
   const [model, setModel] = useState(agent.model || 'claude-sonnet-4-6')
+  const [tools, setTools] = useState(agent.tools || getDefaultTools(agent.role || agent.id))
+  const [customTools, setCustomTools] = useState((agent.customTools || []).join(', '))
   const [showPrompt, setShowPrompt] = useState(false)
   const [promptText, setPromptText] = useState(agent.systemPrompt || '')
 
@@ -96,12 +99,19 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
     }))
   }
 
+  const toggleTool = (toolId) => {
+    setTools(prev => prev.includes(toolId) ? prev.filter(t => t !== toolId) : [...prev, toolId])
+  }
+
   const handleSave = () => {
     const skillsArr = personality.skills.split(',').map(s => s.trim()).filter(Boolean)
+    const customToolsArr = customTools.split(',').map(s => s.trim()).filter(Boolean)
     onSave({
       position,
       personality: { ...personality, skills: skillsArr },
       model,
+      tools,
+      customTools: customToolsArr,
       systemPrompt: promptText,
     })
   }
@@ -355,6 +365,38 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
                     {COMM_STYLES.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
+              </div>
+              <div>
+                <label className={labelClass}>
+                  <span className="flex items-center gap-1.5"><Wrench size={12} /> Инструменты</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {AVAILABLE_TOOLS.map(t => (
+                    <button
+                      key={t}
+                      onClick={() => toggleTool(t)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer border ${
+                        tools.includes(t)
+                          ? 'bg-[var(--ac)] text-white border-[var(--ac)]'
+                          : 'bg-[var(--bg2)] text-[var(--t3)] border-[var(--bd)] hover:border-[var(--ac)]'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-[10px] text-[var(--t3)] mt-1">
+                  {tools.map(t => TOOL_DESCRIPTIONS[t] || t).join(' / ')}
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Кастомные инструменты</label>
+                <input
+                  value={customTools}
+                  onChange={(e) => setCustomTools(e.target.value)}
+                  placeholder="Через запятую: Figma, Jira, Slack..."
+                  className={`${inputClass} mt-1`}
+                />
               </div>
               <div>
                 <label className={labelClass}>LLM модель</label>

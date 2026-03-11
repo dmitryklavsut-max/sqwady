@@ -339,7 +339,7 @@ export default function ChatPanel() {
         const assigneeName = team[0]?.personality?.name || team[0]?.label || 'CEO'
         replyText = `Задача создана: "${taskTitle}". Назначена на ${assigneeName}. Добавлена в колонку To Do.`
       } else {
-        replyText = await chatWithAgent(agent, text, context)
+        replyText = await chatWithAgent(agent, text, context, dispatch, () => state)
       }
 
       // Realistic typing delay (2-3 sec)

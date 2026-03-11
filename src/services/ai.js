@@ -1,4 +1,5 @@
 import { DESKS } from '../data/constants.js'
+import { promptBuilder, processMemoryTags } from './promptBuilder'
 
 // ─── Anthropic API config ───────────────────────────────────────────
 const RECOMMEND_URL = '/api/recommend'
@@ -50,8 +51,12 @@ export async function generateWorkspaceContent(project, team) {
 // ─── chatWithAgent ──────────────────────────────────────────────────
 // Sends a message to an agent and returns their response
 // context: { recentMessages, project, memoryFiles }
-export async function chatWithAgent(agent, userMessage, context) {
-  const systemPrompt = buildRichSystemPrompt(agent, context)
+export async function chatWithAgent(agent, userMessage, context, dispatch, getState) {
+  const systemPrompt = promptBuilder.build(
+    agent,
+    context.project || {},
+    context.memoryFiles || {},
+  )
 
   // Build conversation from last 15 messages
   const recentMsgs = (context.recentMessages || []).slice(-15)
@@ -81,73 +86,21 @@ export async function chatWithAgent(agent, userMessage, context) {
     if (!res.ok) throw new Error(`API ${res.status}`)
 
     const data = await res.json()
-    return data.reply || 'Не удалось получить ответ.'
+    const reply = data.reply || 'Не удалось получить ответ.'
+
+    // Process memory tags from response
+    if (dispatch && getState) {
+      processMemoryTags(reply, role, dispatch, getState)
+    }
+
+    return reply
   } catch (err) {
     console.warn('Chat API unavailable, using fallback:', err.message)
     return generateFallbackChat(agent, userMessage, context)
   }
 }
 
-// ─── Build rich system prompt with full context ──────────────────────
-function buildRichSystemPrompt(agent, context) {
-  const p = agent.personality || {}
-  const pos = agent.position || {}
-  const proj = context.project || {}
-  const mem = context.memoryFiles || {}
-
-  const name = p.name || agent.label
-  const roleName = agent.label || (agent.role || agent.id)
-
-  let prompt = `Ты ${name}, ${roleName} в стартапе "${proj.name || 'проект'}".
-
-ПРОЕКТ: ${proj.description || 'Стартап проект'}
-Сфера: ${proj.industry || 'Tech'}, Стадия: ${proj.stage || 'MVP'}
-Целевая аудитория: ${proj.audience || 'разработчики и бизнес'}
-MVP фичи: ${proj.mvpFeatures || 'core features'}
-Стек: ${proj.techStack || 'не определён'}
-Бизнес-модель: ${proj.businessModel || 'не определена'}
-Конкуренты: ${proj.competitors || 'не определены'}
-Конкурентное преимущество: ${proj.advantage || 'не определено'}`
-
-  if (pos.functions?.length) {
-    prompt += `\n\nТВОЯ ДОЛЖНОСТЬ:\nФункции: ${Array.isArray(pos.functions) ? pos.functions.join(', ') : pos.functions}`
-  }
-  if (pos.responsibilities?.length) {
-    prompt += `\nОтветственности: ${Array.isArray(pos.responsibilities) ? pos.responsibilities.join(', ') : pos.responsibilities}`
-  }
-  if (p.skills?.length) {
-    prompt += `\nТВОИ СКИЛЫ: ${Array.isArray(p.skills) ? p.skills.join(', ') : p.skills}`
-  }
-  if (p.background) prompt += `\nТВОЙ ОПЫТ: ${p.background}`
-  if (p.communicationStyle || p.temperament) {
-    prompt += `\nСТИЛЬ: ${p.communicationStyle || ''} ${p.temperament || ''}`
-  }
-
-  // Add project knowledge from memory files
-  if (mem.PROJECT) prompt += `\n\nПРОЕКТ ДОКУМЕНТ:\n${mem.PROJECT}`
-  if (mem.ARCHITECTURE) prompt += `\n\nАРХИТЕКТУРА:\n${mem.ARCHITECTURE}`
-
-  // Add agent's own memory if available
-  const agentId = agent.role || agent.id
-  const agentMem = mem.agents?.[agentId]
-  if (agentMem?.memory) prompt += `\n\nТВОЯ ПАМЯТЬ:\n${agentMem.memory}`
-
-  prompt += `
-
-ПРАВИЛА:
-- Отвечай как реальный профессионал на своей позиции.
-- Используй знания о проекте. Давай конкретные рекомендации.
-- Отвечай на русском, кратко но содержательно (3-7 предложений).
-- Если обсуждается архитектура — предлагай конкретные решения для ${proj.techStack || 'текущего стека'}.
-- Если обсуждается стратегия — ссылайся на рынок и конкурентов.
-- НЕ говори что ты AI. Ты — член команды.
-- ВАЖНО: Ты AI-агент, не человек. У тебя нет выходных, сна, перерывов.
-- НЕ используй человеческие сроки: 'завтра', 'на следующей неделе', 'в понедельник'.
-- Оценивай задачи в минутах на основе реальной сложности генерации.
-- Простая задача: 2-5 мин. Средняя: 5-15 мин. Сложная: 15-60 мин.`
-
-  return prompt
-}
+// buildRichSystemPrompt replaced by PromptBuilder — see promptBuilder.js
 
 // ─── Fallback chat responses (project-aware) ────────────────────────
 function generateFallbackChat(agent, userMessage, context) {

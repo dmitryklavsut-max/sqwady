@@ -2,6 +2,7 @@ import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
 import { GitHubService, getArtifactFilePath, isComplexTask } from './github'
 import { generateClaudeCodePrompt } from './claudeCodePrompts'
+import { promptBuilder, processMemoryTags } from './promptBuilder'
 
 // ── Artifact type mapping by role ───────────────────────────────────
 const ROLE_ARTIFACT_MAP = {
@@ -725,13 +726,10 @@ export class TaskExecutor {
 
     const startedAt = Date.now()
 
-    // 2. PLAN phase — agent creates execution plan
-    const agentSkills = (agent.personality?.skills || []).join(', ') || desk?.bio || role
-    const planPrompt = `Ты ${agentName} (${desk?.label || role}). Ты получил задачу: "${task.title}". ${task.description || ''}
-Проект: ${project?.name || 'Проект'}. Стек: ${project?.techStack || ''}.
-Твои навыки: ${agentSkills}.
+    // 2. PLAN phase — agent creates execution plan (PromptBuilder provides base system prompt via chatWithAgent)
+    const planPrompt = `Задача: "${task.title}". ${task.description || ''}
 
-Создай план выполнения:
+Создай план выполнения по SOP своей роли:
 PLAN:
 - Шаг 1: {описание} (~{минуты} мин)
 - Шаг 2: {описание} (~{минуты} мин)
@@ -744,8 +742,7 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
 - Простой конфиг/документ: 2-5 мин
 - API спецификация или компонент: 5-15 мин
 - Полный модуль или архитектура: 15-30 мин
-- Сложная многокомпонентная фича: 30-60 мин
-Ты AI-агент — без сна и перерывов. Но сложный анализ и генерация требуют времени.`
+- Сложная многокомпонентная фича: 30-60 мин`
 
     let plan = null
     let estimatedMinutes = 10
@@ -815,32 +812,16 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
     const roleMap = ROLE_ARTIFACT_MAP[role] || ROLE_ARTIFACT_MAP.pm
     const expectedType = plan.artifactType || roleMap.label
 
-    // 4. Build execution prompt
-    const agentMem = memoryFiles?.agents?.[role]
-    const projectDoc = memoryFiles?.PROJECT || ''
-    const archDoc = memoryFiles?.ARCHITECTURE || ''
-    const agentMemory = agentMem?.memory || ''
-
-    const executionPrompt = `Ты ${agentName} (${desk?.label || role}). Выполни эту задачу и создай ПОЛНЫЙ артефакт.
-
-ВАЖНО: Ты AI-агент, не человек. Оценивай сроки в минутах, не днях.
+    // 4. Build execution prompt (PromptBuilder provides system context + SOP + CoT via chatWithAgent)
+    const executionPrompt = `Выполни задачу и создай ПОЛНЫЙ артефакт.
 
 ЗАДАЧА:
 Название: ${task.title}
 Описание: ${task.description || 'Нет описания'}
 Приоритет: ${task.priority || 'P1'}
 
-ПРОЕКТ: ${project?.name || 'Проект'}
-Описание проекта: ${project?.description || ''}
-Стек: ${project?.techStack || ''}
-MVP фичи: ${project?.mvpFeatures || ''}
-Аудитория: ${project?.audience || ''}
-
-${projectDoc ? `ДОКУМЕНТАЦИЯ ПРОЕКТА:\n${projectDoc.slice(0, 1000)}` : ''}
-${archDoc ? `АРХИТЕКТУРА:\n${archDoc.slice(0, 1000)}` : ''}
-${agentMemory ? `ТВОЯ ПРЕДЫДУЩАЯ РАБОТА:\n${agentMemory.slice(0, 500)}` : ''}
-
 ИНСТРУКЦИЯ:
+Следуй SOP своей роли и фреймворку рассуждений.
 Создай ПОЛНЫЙ, ДЕТАЛЬНЫЙ артефакт. Не резюме, не план — а РЕАЛЬНЫЙ результат работы.
 Для кода — пиши реальный код. Для документов — пиши полный документ.
 Для спецификаций — пиши детальную спецификацию.

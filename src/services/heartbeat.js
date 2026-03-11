@@ -2,6 +2,7 @@ import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
 import { getDaysRemaining } from './sprintPlanner'
 import { TaskExecutor } from './taskExecutor'
+import { promptBuilder, processMemoryTags } from './promptBuilder'
 
 // ── Heartbeat system prompt for status polling ──────────────────
 const HEARTBEAT_SYSTEM_SUFFIX = `
@@ -245,7 +246,7 @@ ${tasksSummary}
 Общий контекст проекта: ${project?.name || 'Проект'}, стадия: ${project?.stage || 'MVP'}.${sprintContext}
 ${HEARTBEAT_SYSTEM_SUFFIX}`
 
-    // Build context for chatWithAgent
+    // Build context for chatWithAgent (PromptBuilder generates system prompt inside chatWithAgent)
     const context = {
       recentMessages: [],
       project: project || {},
@@ -266,6 +267,9 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
     if (!responseText.includes('STATUS:')) {
       responseText = generateMockHeartbeat(agent, tasks || [], project || {})
     }
+
+    // Process memory tags from response
+    processMemoryTags(responseText, role, this.dispatch, this.getState)
 
     const parsed = parseHeartbeatResponse(responseText, role)
 

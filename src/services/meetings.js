@@ -1,5 +1,6 @@
 import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
+import { processMemoryTags } from './promptBuilder'
 
 // ── Meeting type configs ───────────────────────────────────────
 const MEETING_TYPES = {
@@ -282,6 +283,9 @@ ${extraContext.context || ''}
       } catch {
         responseText = generateMockMeetingResponse(agent, type, agenda, previousSpeakers)
       }
+
+      // Process memory tags from meeting response
+      processMemoryTags(responseText, role, this.dispatch, this.getState)
 
       // Post agent's message
       const agentMsg = {
