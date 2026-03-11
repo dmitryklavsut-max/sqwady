@@ -114,9 +114,13 @@ export default function Workspace({ project, team, onBackToHub }) {
               <div className="text-[11px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Команда</div>
               {team.map((t) => {
                 const name = t.personality?.name || t.label
-                const desk = DESKS.find(d => d.id === (t.role || t.id))
+                const roleId = t.role || t.id
+                const desk = DESKS.find(d => d.id === roleId)
                 const color = desk?.color || t.color || 'var(--ac)'
                 const initials = getInitials(name)
+                const prog = state.agentProgress?.[roleId]
+                const isWorking = prog && prog.phase && prog.phase !== 'idle' && prog.percent > 0 && prog.percent < 100
+                const justDone = prog && prog.phase === 'complete'
                 return (
                   <button
                     key={t.id || t.role}
@@ -124,14 +128,41 @@ export default function Workspace({ project, team, onBackToHub }) {
                     className="flex items-center gap-2.5 py-1.5 px-1 rounded-lg hover:bg-[var(--bg3)] transition-colors cursor-pointer w-full text-left bg-transparent border-none"
                     style={{ fontFamily: 'inherit' }}
                   >
-                    <div className="relative shrink-0">
+                    <div className="relative shrink-0" style={{ width: 32, height: 32 }}>
+                      {isWorking && (
+                        <svg
+                          className="absolute inset-0"
+                          width="32" height="32"
+                          viewBox="0 0 32 32"
+                          style={{ transform: 'rotate(-90deg)' }}
+                        >
+                          <circle cx="16" cy="16" r="14.5" fill="none" stroke="var(--bd)" strokeWidth="2" />
+                          <circle
+                            cx="16" cy="16" r="14.5" fill="none"
+                            stroke="var(--ac)" strokeWidth="2"
+                            strokeDasharray={`${(prog.percent / 100) * 91.1} 91.1`}
+                            strokeLinecap="round"
+                            style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                          />
+                        </svg>
+                      )}
+                      {justDone && (
+                        <svg
+                          className="absolute inset-0 animate-fade-in"
+                          width="32" height="32"
+                          viewBox="0 0 32 32"
+                          style={{ transform: 'rotate(-90deg)' }}
+                        >
+                          <circle cx="16" cy="16" r="14.5" fill="none" stroke="var(--gn)" strokeWidth="2" strokeDasharray="91.1 91.1" />
+                        </svg>
+                      )}
                       <div
-                        className="flex items-center justify-center rounded-full font-bold text-[10px] select-none"
-                        style={{ width: 28, height: 28, background: `${color}22`, color }}
+                        className="absolute flex items-center justify-center rounded-full font-bold text-[10px] select-none"
+                        style={{ width: 28, height: 28, top: 2, left: 2, background: `${color}22`, color }}
                       >
                         {initials}
                       </div>
-                      <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-[var(--gn)] border-[1.5px] border-[var(--bg2)]" />
+                      <div className={`absolute w-2 h-2 rounded-full border-[1.5px] border-[var(--bg2)] ${isWorking ? 'bg-[var(--ac)] animate-pulse' : justDone ? 'bg-[var(--gn)]' : 'bg-[var(--gn)]'}`} style={{ bottom: 0, right: 0 }} />
                     </div>
                     <div className="min-w-0">
                       <div className="text-[13px] font-medium text-[var(--t)] truncate">{name}</div>

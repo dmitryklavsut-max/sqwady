@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Check, ChevronDown, ChevronUp, Lightbulb, Wrench } from 'lucide-react'
+import { X, Check, ChevronDown, ChevronUp, Lightbulb, Wrench, Activity, Clock, CheckCircle, Loader, Circle } from 'lucide-react'
 import { DESKS, MODELS, WORKSPACE_TABS } from '../data/constants'
 import { AVAILABLE_TOOLS, TOOL_DESCRIPTIONS, getDefaultTools } from '../services/promptBuilder'
+import { useApp } from '../context/AppContext'
 import RoleIcon from './RoleIcon'
 import Avatar from './Avatar'
 import Button from './Button'
@@ -43,7 +44,18 @@ export function generateSystemPrompt(role, position, personality, projectName) {
  *   onSave(data) — called with { position, personality, model, systemPrompt }
  *   onClose   — close handler
  */
+const PHASE_LABELS = {
+  idle: { icon: '💤', text: 'Ожидание' },
+  analyzing: { icon: '🔍', text: 'Анализ...' },
+  planning: { icon: '📋', text: 'Планирование...' },
+  executing: { icon: '⚙️', text: 'Выполнение...' },
+  validating: { icon: '🔎', text: 'Валидация...' },
+  saving: { icon: '💾', text: 'Сохранение...' },
+  complete: { icon: '✅', text: 'Готово' },
+}
+
 export default function AgentConfigModal({ agent, projectName, onSave, onClose }) {
+  const { state: appState } = useApp()
   const [tab, setTab] = useState('position')
 
   const [position, setPosition] = useState({
@@ -184,6 +196,16 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
             }`}
           >
             Личность
+          </button>
+          <button
+            onClick={() => setTab('monitor')}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer border-none flex items-center gap-1.5 ${
+              tab === 'monitor'
+                ? 'bg-[var(--ac)] text-white'
+                : 'bg-[var(--bg2)] text-[var(--t2)] hover:text-[var(--t)]'
+            }`}
+          >
+            <Activity size={12} /> Монитор
           </button>
         </div>
 
@@ -427,6 +449,8 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
               </div>
             </>
           )}
+
+          {tab === 'monitor' && <MonitorTab roleId={roleId} appState={appState} />}
         </div>
 
         {/* Actions */}
@@ -439,6 +463,165 @@ export default function AgentConfigModal({ agent, projectName, onSave, onClose }
           </Button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Monitor Tab component ──────────────────────────────────────
+function MonitorTab({ roleId, appState }) {
+  const [showCompleted, setShowCompleted] = useState(false)
+  const progress = appState.agentProgress?.[roleId]
+  const tasks = appState.tasks || []
+  const artifacts = appState.artifacts || []
+  const wikiPages = appState.wikiPages || []
+
+  const agentTasks = tasks.filter(t => t.assignee === roleId)
+  const todoTasks = agentTasks.filter(t => t.column === 'todo').sort((a, b) => {
+    const po = { P0: 0, P1: 1, P2: 2, P3: 3 }
+    return (po[a.priority] || 9) - (po[b.priority] || 9)
+  })
+  const doneTasks = agentTasks.filter(t => t.column === 'done')
+  const agentArtifacts = artifacts.filter(a => a.agentId === roleId)
+  const avgTime = agentArtifacts.length > 0
+    ? Math.round(agentArtifacts.reduce((s, a) => s + (a.actualMinutes || 0), 0) / agentArtifacts.length)
+    : 0
+
+  const isActive = progress && progress.phase && progress.phase !== 'idle' && progress.percent > 0
+
+  const phaseInfo = PHASE_LABELS[progress?.phase] || PHASE_LABELS.idle
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Current Task */}
+      <div className="rounded-xl p-4" style={{ background: 'var(--bg2)', border: '1px solid var(--bd)' }}>
+        <div className="text-[10px] font-bold text-[var(--t3)] uppercase tracking-wider mb-2">Текущая задача</div>
+        {isActive ? (
+          <>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm font-semibold text-[var(--t)] flex-1 truncate">{progress.taskTitle}</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                progress.priority === 'P0' ? 'bg-red-500/20 text-red-400' :
+                progress.priority === 'P1' ? 'bg-orange-500/20 text-orange-400' :
+                progress.priority === 'P2' ? 'bg-blue-500/20 text-blue-400' :
+                'bg-gray-500/20 text-gray-400'
+              }`}>{progress.priority}</span>
+              {progress.estimatedMinutes && (
+                <span className="flex items-center gap-1 text-[10px] text-[var(--t3)]">
+                  <Clock size={10} /> ~{progress.estimatedMinutes} мин
+                </span>
+              )}
+            </div>
+
+            {/* Progress bar */}
+            <div className="relative h-2 rounded-full overflow-hidden mb-2" style={{ background: 'var(--bg3)' }}>
+              <div
+                className="absolute inset-y-0 left-0 rounded-full transition-all duration-500"
+                style={{
+                  width: `${progress.percent}%`,
+                  background: progress.phase === 'complete' ? 'var(--gn)' : 'var(--ac)',
+                }}
+              />
+            </div>
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-xs font-medium text-[var(--t2)]">
+                {phaseInfo.icon} {phaseInfo.text}
+              </span>
+              <span className="text-xs font-bold text-[var(--ac)]">{progress.percent}%</span>
+            </div>
+
+            {/* Steps stream */}
+            <div className="max-h-[140px] overflow-y-auto flex flex-col gap-1 pr-1" style={{ scrollbarWidth: 'thin' }}>
+              {(progress.steps || []).map((step, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs">
+                  {step.status === 'done' ? (
+                    <CheckCircle size={12} className="text-emerald-500 shrink-0 mt-0.5" />
+                  ) : step.status === 'active' ? (
+                    <Loader size={12} className="text-[var(--ac)] shrink-0 mt-0.5 animate-spin" />
+                  ) : (
+                    <Circle size={12} className="text-[var(--t3)] shrink-0 mt-0.5" />
+                  )}
+                  <span className={`flex-1 ${
+                    step.status === 'active' ? 'text-[var(--t)] font-medium' :
+                    step.status === 'done' ? 'text-[var(--t2)]' : 'text-[var(--t3)]'
+                  }`}>{step.text}</span>
+                  <span className="text-[10px] text-[var(--t3)] shrink-0">
+                    {new Date(step.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 py-3">
+            <div className="w-2 h-2 rounded-full bg-[var(--t3)]" />
+            <span className="text-sm text-[var(--t3)]">Агент ожидает задачу</span>
+          </div>
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-4 gap-2">
+        {[
+          { label: 'Выполнено', value: doneTasks.length },
+          { label: 'Артефактов', value: agentArtifacts.length },
+          { label: 'Ср. время', value: avgTime ? `${avgTime} м` : '—' },
+          { label: 'Очередь', value: todoTasks.length },
+        ].map((s, i) => (
+          <div key={i} className="rounded-lg p-2 text-center" style={{ background: 'var(--bg2)', border: '1px solid var(--bd)' }}>
+            <div className="text-base font-bold text-[var(--t)]">{s.value}</div>
+            <div className="text-[10px] text-[var(--t3)]">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Task Queue */}
+      {todoTasks.length > 0 && (
+        <div>
+          <div className="text-[10px] font-bold text-[var(--t3)] uppercase tracking-wider mb-1.5">Очередь задач</div>
+          <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+            {todoTasks.map(t => (
+              <div key={t.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs" style={{ background: 'var(--bg2)' }}>
+                <span className={`px-1 py-0.5 rounded text-[9px] font-bold ${
+                  t.priority === 'P0' ? 'bg-red-500/20 text-red-400' :
+                  t.priority === 'P1' ? 'bg-orange-500/20 text-orange-400' :
+                  t.priority === 'P2' ? 'bg-blue-500/20 text-blue-400' :
+                  'bg-gray-500/20 text-gray-400'
+                }`}>{t.priority}</span>
+                <span className="flex-1 truncate text-[var(--t)]">{t.title}</span>
+                {t.estimatedMinutes && <span className="text-[10px] text-[var(--t3)]">~{t.estimatedMinutes}м</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Completed */}
+      {doneTasks.length > 0 && (
+        <div>
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--t3)] uppercase tracking-wider cursor-pointer bg-transparent border-none hover:text-[var(--t2)] transition-colors"
+          >
+            {showCompleted ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            Завершённые ({doneTasks.length})
+          </button>
+          {showCompleted && (
+            <div className="flex flex-col gap-1 mt-1.5 max-h-[120px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+              {doneTasks.map(t => {
+                const art = artifacts.find(a => a.taskId === t.id)
+                return (
+                  <div key={t.id} className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs" style={{ background: 'var(--bg2)' }}>
+                    <CheckCircle size={12} className="text-emerald-500 shrink-0" />
+                    <span className="flex-1 truncate text-[var(--t2)]">{t.title}</span>
+                    {t.actualMinutes && <span className="text-[10px] text-[var(--t3)]">{t.actualMinutes}м</span>}
+                    {art && <span className="text-[10px] text-[var(--ac)]">📄</span>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

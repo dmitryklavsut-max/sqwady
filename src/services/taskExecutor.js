@@ -763,15 +763,41 @@ export class TaskExecutor {
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'starting' })
 
+    const startedAt = Date.now()
+    const progressSteps = []
+
+    const emitProgress = (phase, percent, stepText) => {
+      if (stepText) {
+        // Mark previous active steps as done
+        progressSteps.forEach(s => { if (s.status === 'active') s.status = 'done' })
+        progressSteps.push({ text: stepText, timestamp: new Date().toISOString(), status: 'active' })
+      }
+      this.dispatch({
+        type: 'SET_AGENT_PROGRESS',
+        payload: {
+          agentId: role,
+          taskId: task.id,
+          taskTitle: task.title,
+          phase,
+          percent,
+          steps: [...progressSteps],
+          currentStep: progressSteps.length - 1,
+          startedAt: new Date(startedAt).toISOString(),
+          estimatedMinutes: task.estimatedMinutes || 10,
+          priority: task.priority || 'P1',
+        },
+      })
+    }
+
     // 1. Move task to "In Progress"
+    emitProgress('analyzing', 0, `Анализ задачи: "${task.title}"`)
+
     this.dispatch({
       type: 'UPDATE_TASK',
       payload: { id: task.id, column: 'in_progress' },
     })
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'in_progress' })
-
-    const startedAt = Date.now()
 
     // 2. PLAN phase — agent creates execution plan (PromptBuilder provides base system prompt via chatWithAgent)
     const planPrompt = `Задача: "${task.title}". ${task.description || ''}
@@ -855,6 +881,15 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'planned', plan, estimatedMinutes })
 
+    // Emit plan steps to progress
+    emitProgress('planning', 15, `План создан: ${plan.steps.length} шагов, ~${estimatedMinutes} мин`)
+    for (let i = 0; i < plan.steps.length; i++) {
+      const stepPercent = 20 + Math.round((60 / plan.steps.length) * i)
+      emitProgress('executing', stepPercent, plan.steps[i].step)
+      // Brief pause so UI can render each step
+      await new Promise(r => setTimeout(r, 200))
+    }
+
     // 3. Determine artifact type
     const roleMap = ROLE_ARTIFACT_MAP[role] || ROLE_ARTIFACT_MAP.pm
     const expectedType = plan.artifactType || roleMap.label
@@ -894,6 +929,7 @@ CONTENT:
 {ПОЛНЫЙ АРТЕФАКТ — это главный результат твоей работы}`
 
     // 5. Call API or generate mock
+    emitProgress('executing', 70, 'Генерация артефакта...')
     let artifact
     try {
       const context = { recentMessages: [], project: project || {}, memoryFiles: memoryFiles || {} }
@@ -912,6 +948,8 @@ CONTENT:
     // Record actual execution time
     const finishedAt = Date.now()
     const actualMinutes = Math.round((finishedAt - startedAt) / 60000) || 1
+
+    emitProgress('validating', 80, `Артефакт создан: "${artifact.title}" (${artifact.type})`)
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'artifact_created', artifact })
 
@@ -937,6 +975,8 @@ CONTENT:
     })
 
     this.dispatch({ type: 'ADD_ARTIFACT', payload: artifactRecord })
+
+    emitProgress('saving', 90, 'Сохранение артефакта в Wiki и память...')
 
     // 6. Add as Wiki page
     const currentPages = this.state.wikiPages || []
@@ -1082,6 +1122,16 @@ CONTENT:
         },
       },
     })
+
+    // Mark all steps done and set complete
+    emitProgress('complete', 100, `Отправлено на ревью → ${DESKS.find(d => d.id === reviewerRole)?.label || reviewerRole}`)
+    // Clear progress after short delay so UI shows the 100% state briefly
+    setTimeout(() => {
+      this.dispatch({
+        type: 'SET_AGENT_PROGRESS',
+        payload: { agentId: role, taskId: null, taskTitle: null, phase: 'idle', percent: 0, steps: [], currentStep: -1, startedAt: null },
+      })
+    }, 3000)
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'review', reviewerRole })
 

@@ -30,6 +30,7 @@ const initialState = {
   recommendations: null,
   github: { connected: false, token: '', owner: '', repo: '' },
   heartbeatPaused: false,
+  agentProgress: {},
 }
 
 function loadState() {
@@ -133,6 +134,14 @@ function reducer(state, action) {
       return { ...state, currentSprintId: action.payload }
     case 'SET_WATCHDOG_ISSUES':
       return { ...state, watchdogIssues: action.payload }
+    case 'SET_AGENT_PROGRESS':
+      return {
+        ...state,
+        agentProgress: {
+          ...state.agentProgress,
+          [action.payload.agentId]: action.payload,
+        },
+      }
     case 'SET_RECOMMENDATIONS':
       return { ...state, recommendations: action.payload }
     case 'LOAD_PROJECT_STATE':
@@ -150,7 +159,9 @@ export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, loadState)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    // Don't persist transient agentProgress
+    const { agentProgress, ...persistable } = state
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable))
   }, [state])
 
   return (
