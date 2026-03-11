@@ -28,6 +28,7 @@ const initialState = {
     agents: {},
   },
   recommendations: null,
+  github: { connected: false, token: '', owner: '', repo: '' },
 }
 
 function loadState() {
@@ -103,6 +104,8 @@ function reducer(state, action) {
           [action.payload.key]: action.payload.value,
         },
       }
+    case 'SET_GITHUB':
+      return { ...state, github: { ...state.github, ...action.payload } }
     case 'ADD_ARTIFACT':
       return { ...state, artifacts: [...(state.artifacts || []), action.payload] }
     case 'UPDATE_ARTIFACT':

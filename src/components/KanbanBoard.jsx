@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react'
 import { DndContext, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
-import { Plus, X, Check, Trash2, Snowflake } from 'lucide-react'
+import { Plus, X, Check, Trash2, Snowflake, Github, Zap, Copy, ExternalLink, FileText, User } from 'lucide-react'
 import { KANBAN_COLS, KANBAN_NAMES, KANBAN_COLORS, PRIORITY_COLORS, DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
@@ -41,8 +41,8 @@ function TaskCard({ task, team, onClick, isInSprint }) {
         isDragging ? 'opacity-40 scale-95' : isFrozen ? '' : 'hover:-translate-y-0.5 hover:border-[rgba(99,102,241,0.2)]'
       }`}
       style={{
-        borderLeft: `3px solid ${isFrozen ? '#38bdf8' : (PRIORITY_COLORS[task.priority] || '#94a3b8')}`,
-        boxShadow: 'var(--card-shadow)',
+        borderLeft: `3px solid ${task.isUserTask ? '#f59e0b' : isFrozen ? '#38bdf8' : (PRIORITY_COLORS[task.priority] || '#94a3b8')}`,
+        boxShadow: task.isUserTask ? '0 0 12px -3px rgba(245,158,11,0.3)' : 'var(--card-shadow)',
         padding: 14,
       }}
     >
@@ -80,9 +80,38 @@ function TaskCard({ task, team, onClick, isInSprint }) {
           ))}
         </div>
       )}
+      {/* Integration badges */}
+      {(task.commitUrl || task.needsClaudeCode || task.isUserTask) && (
+        <div className="flex flex-wrap gap-1 mb-2">
+          {task.commitUrl && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'rgba(255,255,255,0.06)', color: '#a1a1aa' }}>
+              <Github size={10} /> GitHub
+            </span>
+          )}
+          {task.needsClaudeCode && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>
+              <Zap size={10} /> Claude Code
+            </span>
+          )}
+          {task.isUserTask && (
+            <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: 'rgba(234,179,8,0.15)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.3)' }}>
+              <User size={10} /> Ваше действие
+            </span>
+          )}
+        </div>
+      )}
       {/* Bottom: assignee + due date */}
       <div className="flex items-center justify-between">
-        {agent && (
+        {task.assignee === 'user' ? (
+          <div className="flex items-center gap-1.5">
+            <div className="flex items-center justify-center rounded-full font-bold select-none"
+              style={{ width: 22, height: 22, background: '#f59e0b22', color: '#f59e0b', fontSize: 9 }}
+            >
+              <User size={12} />
+            </div>
+            <span className="text-[11px] text-[var(--t3)] font-medium">Вы</span>
+          </div>
+        ) : agent && (
           <div className="flex items-center gap-1.5">
             <div
               className="flex items-center justify-center rounded-full font-bold select-none"
@@ -139,7 +168,7 @@ function Column({ colId, tasks, team, onClickTask, sprintTaskIds }) {
 }
 
 /* ── Create/Edit Modal ─────────────────────────────── */
-function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
+function TaskModal({ task, isNew, team, artifacts, onSave, onDelete, onClose }) {
   const [form, setForm] = useState({
     title: task.title || '',
     description: task.description || '',
@@ -149,6 +178,21 @@ function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
     tags: (task.tags || []).join(', '),
     dueDate: task.dueDate || '',
   })
+  const [detailTab, setDetailTab] = useState('edit') // edit | artifact | github | claude
+  const [copied, setCopied] = useState(false)
+
+  const taskArtifact = !isNew ? (artifacts || []).find(a => a.id === task.artifactId) : null
+  const hasGitHub = !!task.commitUrl
+  const hasClaudeCode = !!task.needsClaudeCode
+
+  const copyPrompt = () => {
+    const prompt = task.claudeCodePrompt || taskArtifact?.claudeCodePrompt || ''
+    if (prompt) {
+      navigator.clipboard.writeText(prompt)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -178,11 +222,108 @@ function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
         style={{ boxShadow: 'var(--shadow-lg)' }}
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="text-lg font-semibold mb-5">
-          {isNew ? 'Новая задача' : `Редактировать ${task.id}`}
+        <h2 className="text-lg font-semibold mb-3">
+          {isNew ? 'Новая задача' : `${task.id} — ${task.title}`}
         </h2>
 
-        <div className="flex flex-col gap-3">
+        {/* Tabs for existing tasks with artifacts */}
+        {!isNew && (taskArtifact || hasGitHub || hasClaudeCode) && (
+          <div className="flex gap-1 mb-4 border-b border-[var(--bd)] pb-0">
+            {[
+              { id: 'edit', label: 'Редактировать' },
+              ...(taskArtifact ? [{ id: 'artifact', label: 'Артефакт', icon: FileText }] : []),
+              ...(hasGitHub ? [{ id: 'github', label: 'GitHub', icon: Github }] : []),
+              ...(hasClaudeCode ? [{ id: 'claude', label: 'Claude Code', icon: Zap }] : []),
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setDetailTab(tab.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-[12px] font-medium border-b-2 cursor-pointer bg-transparent border-none transition-colors ${
+                  detailTab === tab.id
+                    ? 'border-b-[var(--ac)] text-[var(--t)]'
+                    : 'border-b-transparent text-[var(--t3)] hover:text-[var(--t2)]'
+                }`}
+                style={{ fontFamily: 'inherit', marginBottom: -1 }}
+              >
+                {tab.icon && <tab.icon size={12} />}
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Artifact tab */}
+        {detailTab === 'artifact' && taskArtifact && (
+          <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-[13px] font-semibold">{taskArtifact.title}</div>
+                <div className="text-[11px] text-[var(--t3)]">
+                  {taskArtifact.type} | {taskArtifact.agentName} | {new Date(taskArtifact.createdAt).toLocaleString('ru-RU')}
+                </div>
+              </div>
+              {taskArtifact.reviewScore && (
+                <span className="text-[12px] font-bold px-2 py-1 rounded-lg" style={{
+                  background: taskArtifact.reviewScore >= 7 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                  color: taskArtifact.reviewScore >= 7 ? '#10b981' : '#f59e0b',
+                }}>
+                  {taskArtifact.reviewScore}/10
+                </span>
+              )}
+            </div>
+            <pre className="text-[12px] text-[var(--t2)] bg-[var(--bg)] p-3 rounded-xl overflow-auto whitespace-pre-wrap leading-relaxed border border-[var(--bd)]">{taskArtifact.content}</pre>
+            {taskArtifact.reviewFeedback && (
+              <div className="text-[12px] text-[var(--t2)] bg-[var(--bg3)] p-3 rounded-xl">
+                <div className="text-[11px] font-semibold text-[var(--t3)] mb-1 uppercase">Ревью</div>
+                {taskArtifact.reviewFeedback}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* GitHub tab */}
+        {detailTab === 'github' && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-[var(--bg)] border border-[var(--bd)]">
+              <Github size={20} className="text-[var(--t3)]" />
+              <div className="flex-1">
+                <div className="text-[13px] font-medium">Коммит в репозиторий</div>
+                {task.commitUrl ? (
+                  <a href={task.commitUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-[12px] text-[var(--ac)] hover:underline flex items-center gap-1">
+                    Открыть коммит <ExternalLink size={10} />
+                  </a>
+                ) : (
+                  <span className="text-[12px] text-[var(--t3)]">Коммит URL недоступен</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Claude Code tab */}
+        {detailTab === 'claude' && (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap size={16} className="text-yellow-400" />
+                <span className="text-[13px] font-semibold">Claude Code Prompt</span>
+              </div>
+              <Button onClick={copyPrompt} small variant={copied ? undefined : 'ghost'}>
+                <Copy size={12} /> {copied ? 'Скопировано!' : 'Копировать'}
+              </Button>
+            </div>
+            <p className="text-[11px] text-[var(--t3)]">
+              Эта задача требует Claude Code для реализации. Скопируйте промпт и вставьте в Claude Code CLI.
+            </p>
+            <pre className="text-[11px] text-[var(--t2)] bg-[var(--bg)] p-3 rounded-xl overflow-auto whitespace-pre-wrap leading-relaxed border border-[var(--bd)] max-h-[300px]">
+              {task.claudeCodePrompt || taskArtifact?.claudeCodePrompt || 'Промпт не сгенерирован'}
+            </pre>
+          </div>
+        )}
+
+        {/* Edit tab (default form) */}
+        {detailTab === 'edit' && <div className="flex flex-col gap-3">
           <div>
             <label className="text-xs font-semibold text-[var(--t2)] uppercase tracking-wide">Название</label>
             <input
@@ -267,7 +408,7 @@ function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
               className={`${inputClass} mt-1`}
             />
           </div>
-        </div>
+        </div>}
 
         {/* Frozen indicator + unfreeze */}
         {!isNew && task.frozen && (
@@ -515,6 +656,7 @@ export default function KanbanBoard({ team }) {
           task={modal.task}
           isNew={modal.isNew}
           team={team}
+          artifacts={state.artifacts || []}
           onSave={handleSave}
           onDelete={handleDelete}
           onClose={() => setModal(null)}

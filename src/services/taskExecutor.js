@@ -1,5 +1,7 @@
 import { chatWithAgent } from './ai'
 import { DESKS, timestamp } from '../data/constants'
+import { GitHubService, getArtifactFilePath, isComplexTask } from './github'
+import { generateClaudeCodePrompt } from './claudeCodePrompts'
 
 // ── Artifact type mapping by role ───────────────────────────────────
 const ROLE_ARTIFACT_MAP = {
@@ -841,7 +843,63 @@ CONTENT:
       },
     })
 
-    // 9. Move task to "Review"
+    // 9. GitHub auto-commit (if connected)
+    let commitUrl = null
+    const github = this.state.github
+    if (github?.connected && github.token && github.owner && github.repo) {
+      try {
+        const ghService = new GitHubService(github.token, github.owner, github.repo)
+        const filePath = getArtifactFilePath(artifactRecord, role)
+        const commitMsg = `${artifact.type === 'code' ? 'feat' : 'docs'}: ${task.title}`
+        const result = await ghService.commitFile(filePath, artifact.content, commitMsg)
+        commitUrl = result.commitUrl
+        artifactRecord.commitUrl = commitUrl
+        artifactRecord.filePath = filePath
+        this.dispatch({ type: 'UPDATE_ARTIFACT', payload: { id: artifactRecord.id, commitUrl, filePath } })
+
+        this.dispatch({
+          type: 'ADD_MESSAGE',
+          payload: {
+            channel: 'meeting',
+            message: {
+              id: `gh-${Date.now()}-${role}`,
+              from: role,
+              name: agentName,
+              text: `GitHub: ${filePath} — ${commitMsg}`,
+              time: timestamp(),
+              taskExecution: true,
+            },
+          },
+        })
+      } catch (err) {
+        console.warn('GitHub commit failed:', err.message)
+      }
+    }
+
+    // 10. Claude Code prompt for complex tasks
+    let claudeCodePrompt = null
+    const complex = isComplexTask(task)
+    if (complex) {
+      const promptData = generateClaudeCodePrompt(task, artifactRecord, {
+        project: project || {},
+        memoryFiles: memoryFiles || {},
+        team: this.state.team || [],
+      })
+      claudeCodePrompt = promptData
+      artifactRecord.claudeCodePrompt = promptData.prompt
+      artifactRecord.estimatedComplexity = promptData.estimatedComplexity
+      this.dispatch({
+        type: 'UPDATE_ARTIFACT',
+        payload: {
+          id: artifactRecord.id,
+          claudeCodePrompt: promptData.prompt,
+          estimatedComplexity: promptData.estimatedComplexity,
+          needsClaudeCode: true,
+        },
+      })
+    }
+
+    // 11. Move task to "Review"
     const reviewerRole = getReviewerRole(task, role)
     this.dispatch({
       type: 'UPDATE_TASK',
@@ -850,10 +908,21 @@ CONTENT:
         column: 'review',
         artifactId: artifactRecord.id,
         reviewerRole,
+        commitUrl,
+        needsClaudeCode: complex,
+        claudeCodePrompt: claudeCodePrompt?.prompt || null,
       },
     })
 
-    // 10. Post to Meeting Room
+    // 12. Post to Meeting Room
+    const meetingParts = [
+      `**Задача выполнена:** ${task.title}`,
+      `Артефакт: "${artifact.title}" (${artifact.type})`,
+      `Ревью: ${DESKS.find(d => d.id === reviewerRole)?.label || reviewerRole}`,
+    ]
+    if (commitUrl) meetingParts.push(`GitHub: ${commitUrl}`)
+    if (complex) meetingParts.push(`Требуется Claude Code`)
+
     this.dispatch({
       type: 'ADD_MESSAGE',
       payload: {
@@ -862,7 +931,7 @@ CONTENT:
           id: `exec-${Date.now()}-${role}`,
           from: role,
           name: agentName,
-          text: `🎯 **Задача выполнена:** ${task.title}\n📄 Артефакт: "${artifact.title}" (${artifact.type})\n👀 Отправлено на ревью → ${DESKS.find(d => d.id === reviewerRole)?.label || reviewerRole}`,
+          text: meetingParts.join('\n'),
           time: timestamp(),
           taskExecution: true,
         },
@@ -871,7 +940,50 @@ CONTENT:
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'review', reviewerRole })
 
-    return { task, artifact: artifactRecord, reviewerRole }
+    return { task, artifact: artifactRecord, reviewerRole, commitUrl, claudeCodePrompt }
+
+  }
+
+  // Request user to connect an integration if not connected
+  _requestIntegration(integrationName, reason) {
+    const tasks = this.state.tasks || []
+    // Check if we already have a pending integration request
+    const existing = tasks.find(t =>
+      t.assignee === 'user' && t.column !== 'done' &&
+      t.title.includes(integrationName)
+    )
+    if (existing) return
+
+    const taskId = `T-${String(tasks.length + 1).padStart(3, '0')}`
+    this.dispatch({
+      type: 'ADD_TASK',
+      payload: {
+        id: taskId,
+        title: `Подключить интеграцию: ${integrationName}`,
+        description: `${reason}\nПерейдите в боковую панель → кнопка настроек → подключите ${integrationName}.`,
+        assignee: 'user',
+        priority: 'P0',
+        column: 'todo',
+        tags: ['integration', 'user-action'],
+        dueDate: null,
+        createdAt: new Date().toISOString().slice(0, 10),
+        isUserTask: true,
+      },
+    })
+
+    this.dispatch({
+      type: 'ADD_MESSAGE',
+      payload: {
+        channel: 'meeting',
+        message: {
+          id: `int-req-${Date.now()}`,
+          from: 'system',
+          name: 'Система',
+          text: `Требуется ваше действие: подключить ${integrationName}.\n${reason}`,
+          time: timestamp(),
+        },
+      },
+    })
   }
 
   // Review a task: another agent reviews the artifact

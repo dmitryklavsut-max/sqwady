@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Sun, Moon, FolderOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Sun, Moon, FolderOpen, Github } from 'lucide-react'
 import { WORKSPACE_TABS, DESKS } from '../data/constants'
 import { useTheme } from '../hooks/useTheme'
 import { useApp } from '../context/AppContext'
 import RoleIcon from '../components/RoleIcon'
 import AgentConfigModal from '../components/AgentConfigModal'
 import HeartbeatPanel from '../components/HeartbeatPanel'
+import GitHubModal from '../components/GitHubModal'
 import SprintBar from '../components/SprintBar'
 import WatchdogIndicator from '../components/WatchdogIndicator'
 import ChatPanel from '../components/ChatPanel'
@@ -23,11 +24,13 @@ function getInitials(name) {
 }
 
 export default function Workspace({ project, team, onBackToHub }) {
-  const { dispatch } = useApp()
+  const { state, dispatch } = useApp()
   const [activeTab, setActiveTab] = useState('chat')
   const [collapsed, setCollapsed] = useState(false)
   const [configAgent, setConfigAgent] = useState(null)
+  const [showGitHub, setShowGitHub] = useState(false)
   const { theme, toggle: toggleTheme } = useTheme()
+  const ghConnected = state.github?.connected
 
   const renderTab = () => {
     switch (activeTab) {
@@ -145,6 +148,22 @@ export default function Workspace({ project, team, onBackToHub }) {
             <WatchdogIndicator collapsed={collapsed} />
 
             <button
+              onClick={() => setShowGitHub(true)}
+              className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} w-full h-9 rounded-lg border-none cursor-pointer bg-transparent text-[var(--t3)] hover:text-[var(--t2)] hover:bg-[var(--bg3)] transition-colors duration-150 text-xs`}
+              style={{ fontFamily: 'inherit' }}
+              aria-label="GitHub"
+              title={ghConnected ? `GitHub: ${state.github.owner}/${state.github.repo}` : 'Подключить GitHub'}
+            >
+              <div className="relative shrink-0">
+                <Github size={16} />
+                {ghConnected && (
+                  <div className="absolute -bottom-px -right-px w-2 h-2 rounded-full bg-emerald-500 border-[1.5px] border-[var(--bg2)]" />
+                )}
+              </div>
+              {!collapsed && <span>{ghConnected ? `${state.github.owner}/${state.github.repo}` : 'GitHub'}</span>}
+            </button>
+
+            <button
               onClick={toggleTheme}
               className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3 px-3'} w-full h-9 rounded-lg border-none cursor-pointer bg-transparent text-[var(--t3)] hover:text-[var(--t2)] hover:bg-[var(--bg3)] transition-colors duration-150 text-xs`}
               style={{ fontFamily: 'inherit' }}
@@ -174,6 +193,9 @@ export default function Workspace({ project, team, onBackToHub }) {
           {renderTab()}
         </main>
       </div>
+
+      {/* GitHub settings modal */}
+      {showGitHub && <GitHubModal onClose={() => setShowGitHub(false)} />}
 
       {/* Agent profile modal */}
       {configAgent && (
