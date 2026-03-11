@@ -283,21 +283,22 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
     }
   }
 
-  // Run one full cycle
+  // Run one full cycle — EXECUTE first, REVIEW second, POLL last
   async runCycle(onProgress) {
     if (this._running) return null
     this._running = true
     this._aborted = false
 
-    const { team, tasks, project } = this.state
+    const { team } = this.state
     if (!team || team.length === 0) {
       this._running = false
       return null
     }
 
-    const results = []
     let tasksCompleted = 0
     let tasksCreated = 0
+    let tasksExecuted = 0
+    let tasksReviewed = 0
 
     // Sort: CEO first, then PM, then rest
     const sorted = [...team].sort((a, b) => {
@@ -306,6 +307,73 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       const bO = order[b.role || b.id] ?? 2
       return aO - bO
     })
+
+    // ── PHASE 1: EXECUTE — each agent works on their highest-priority task ──
+    console.log('Heartbeat Phase 1: EXECUTE')
+    for (const agent of sorted) {
+      if (this._aborted) break
+
+      const role = agent.role || agent.id
+      const agentName = agent.personality?.name || agent.label
+
+      // Pick next task: in_progress first (continue work), then todo
+      const nextTask = this.taskExecutor.pickNextTask(role)
+      if (nextTask) {
+        console.log(`Execute: ${agentName} → ${nextTask.id} "${nextTask.title}" [${nextTask.column}]`)
+        if (onProgress) onProgress({ agentId: role, agentName, status: 'executing', taskId: nextTask.id })
+
+        try {
+          await this.taskExecutor.executeTask(nextTask, agent, onProgress)
+          tasksExecuted++
+        } catch (err) {
+          console.warn(`Task execution failed for ${agentName}:`, err.message)
+        }
+
+        if (!this._aborted) await new Promise(r => setTimeout(r, 500))
+      } else {
+        console.log(`Execute: ${agentName} — no tasks to execute`)
+      }
+    }
+
+    // ── PHASE 2: REVIEW — process tasks awaiting review ──
+    console.log('Heartbeat Phase 2: REVIEW')
+    const reviewableTasks = this.taskExecutor.findReviewableTasks()
+    for (const { task: reviewTask, artifact } of reviewableTasks) {
+      if (this._aborted) break
+
+      const reviewerRole = reviewTask.reviewerRole
+      const reviewer = team.find(t => (t.role || t.id) === reviewerRole)
+      if (!reviewer || !artifact) continue
+
+      const reviewerName = reviewer.personality?.name || reviewer.label
+      console.log(`Review: ${reviewerName} reviewing "${reviewTask.title}"`)
+      if (onProgress) onProgress({ agentId: reviewerRole, agentName: reviewerName, status: 'reviewing', taskId: reviewTask.id })
+
+      try {
+        const reviewResult = await this.taskExecutor.reviewTask(reviewTask, reviewer, artifact, onProgress)
+        tasksReviewed++
+
+        if (reviewResult.verdict === 'APPROVED') {
+          tasksCompleted++
+          if (!this._aborted) {
+            const chain = await this.onTaskCompleted(reviewTask.id, onProgress)
+            if (chain) {
+              tasksCreated += chain.tasksCreated
+              tasksCompleted += chain.tasksCompleted
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`Review failed for task ${reviewTask.id}:`, err.message)
+      }
+
+      if (!this._aborted) await new Promise(r => setTimeout(r, 500))
+    }
+
+    // ── PHASE 3: POLL — status check + limited new task creation ──
+    console.log('Heartbeat Phase 3: POLL')
+    const MAX_NEW_TASKS_PER_AGENT = 2
+    const results = []
 
     for (const agent of sorted) {
       if (this._aborted) break
@@ -316,15 +384,15 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       const role = agent.role || agent.id
       const agentName = agent.personality?.name || agent.label
       const desk = DESKS.find(d => d.id === role)
+      const tasks = this.state.tasks || []
 
-      // 1. Process completed tasks — move matching tasks to "done"
+      // Process completed tasks from poll response
       for (const completed of result.completedTasks) {
         let matched = false
 
-        // Try exact ID match first (e.g., "T-001")
         const taskIdMatch = completed.match(/T-\d+/)
         if (taskIdMatch) {
-          const existingTask = (tasks || []).find(t => t.id === taskIdMatch[0] && t.column !== 'done')
+          const existingTask = tasks.find(t => t.id === taskIdMatch[0] && t.column !== 'done')
           if (existingTask) {
             this.dispatch({ type: 'UPDATE_TASK', payload: { id: existingTask.id, column: 'done' } })
             tasksCompleted++
@@ -332,10 +400,9 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
           }
         }
 
-        // Fuzzy match: compare completed text with task titles assigned to this agent
         if (!matched) {
           const completedLower = completed.toLowerCase()
-          const agentTasks = (tasks || []).filter(t => t.assignee === role && t.column !== 'done')
+          const agentTasks = tasks.filter(t => t.assignee === role && t.column !== 'done')
           for (const t of agentTasks) {
             const titleWords = t.title.toLowerCase().split(/\s+/).filter(w => w.length > 3)
             const matchCount = titleWords.filter(w => completedLower.includes(w)).length
@@ -348,27 +415,26 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
         }
       }
 
-      // 2. Create new requested tasks
-      for (const req of result.newTaskRequests) {
+      // Create new tasks — LIMITED to MAX_NEW_TASKS_PER_AGENT
+      const newTasksToCreate = (result.newTaskRequests || []).slice(0, MAX_NEW_TASKS_PER_AGENT)
+      for (const req of newTasksToCreate) {
         const currentTasks = this.state.tasks || []
         const taskId = `T-${String(currentTasks.length + 1).padStart(3, '0')}`
-        // Resolve assignTo — find matching desk/role
         let assignee = req.assignTo
         const matchDesk = DESKS.find(d =>
           d.id === req.assignTo.toLowerCase() ||
           d.label.toLowerCase() === req.assignTo.toLowerCase()
         )
         if (matchDesk) assignee = matchDesk.id
-        // Only assign if that role exists in team
         const hasRole = team.some(t => (t.role || t.id) === assignee)
-        if (!hasRole) assignee = role // fallback to requesting agent
+        if (!hasRole) assignee = role
 
         this.dispatch({
           type: 'ADD_TASK',
           payload: {
             id: taskId,
             title: req.title,
-            description: `Создано автоматически по запросу ${agentName} (${desk?.label || role}) в цикле Heartbeat.`,
+            description: req.description || `Создано автоматически по запросу ${agentName} (${desk?.label || role}) в цикле Heartbeat.`,
             assignee,
             priority: req.priority || 'P1',
             column: 'todo',
@@ -380,7 +446,7 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
         tasksCreated++
       }
 
-      // 3. Post status to Meeting Room channel
+      // Post status to Meeting Room
       const statusLines = [`📊 **Статус:** ${result.status}`]
       if (result.completedTasks.length > 0) {
         statusLines.push(`✅ Завершено: ${result.completedTasks.join(', ')}`)
@@ -388,8 +454,8 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       if (result.needs.length > 0) {
         statusLines.push(`📋 Нужно: ${result.needs.join('; ')}`)
       }
-      if (result.newTaskRequests.length > 0) {
-        statusLines.push(`➕ Новые задачи: ${result.newTaskRequests.map(r => r.title).join('; ')}`)
+      if (newTasksToCreate.length > 0) {
+        statusLines.push(`➕ Новые задачи: ${newTasksToCreate.map(r => r.title).join('; ')}`)
       }
       if (result.blockers.length > 0) {
         statusLines.push(`🚫 Блокеры: ${result.blockers.join('; ')}`)
@@ -410,113 +476,35 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
         },
       })
 
-      // 4. Update agent memory
-      const agentMemKey = `agents`
+      // Update agent memory
       const currentMem = this.state.memoryFiles?.agents || {}
       const agentMem = currentMem[role] || {}
-      const memoryUpdate = {
-        ...agentMem,
-        memory: `${agentMem.memory || ''}\n[${new Date().toLocaleString('ru-RU')}] ${result.status}`.trim(),
-      }
       this.dispatch({
         type: 'UPDATE_MEMORY_FILE',
         payload: {
           key: 'agents',
-          value: { ...currentMem, [role]: memoryUpdate },
+          value: { ...currentMem, [role]: { ...agentMem, memory: `${agentMem.memory || ''}\n[${new Date().toLocaleString('ru-RU')}] ${result.status}`.trim() } },
         },
       })
 
-      if (onProgress) {
-        onProgress({
-          agentId: role,
-          agentName,
-          status: 'done',
-          result,
-        })
-      }
+      if (onProgress) onProgress({ agentId: role, agentName, status: 'done', result })
 
-      // Small delay between polls for UX
-      if (!this._aborted) {
-        await new Promise(r => setTimeout(r, 800))
-      }
+      if (!this._aborted) await new Promise(r => setTimeout(r, 800))
     }
 
-    // 5. Task Execution Phase — agents pick up and execute To Do tasks
-    let tasksExecuted = 0
-    let tasksReviewed = 0
-
-    for (const agent of sorted) {
-      if (this._aborted) break
-
-      const role = agent.role || agent.id
-      const agentName = agent.personality?.name || agent.label
-
-      // Pick next task for this agent
-      const nextTask = this.taskExecutor.pickNextTask(role)
-      if (nextTask) {
-        if (onProgress) onProgress({ agentId: role, agentName, status: 'executing', taskId: nextTask.id })
-
-        try {
-          await this.taskExecutor.executeTask(nextTask, agent, onProgress)
-          tasksExecuted++
-        } catch (err) {
-          console.warn(`Task execution failed for ${agentName}:`, err.message)
-        }
-
-        if (!this._aborted) await new Promise(r => setTimeout(r, 500))
-      }
-    }
-
-    // 6. Review Phase — process tasks awaiting review
-    const reviewableTasks = this.taskExecutor.findReviewableTasks()
-    for (const { task: reviewTask, artifact } of reviewableTasks) {
-      if (this._aborted) break
-
-      const reviewerRole = reviewTask.reviewerRole
-      const reviewer = team.find(t => (t.role || t.id) === reviewerRole)
-      if (!reviewer || !artifact) continue
-
-      const reviewerName = reviewer.personality?.name || reviewer.label
-      if (onProgress) onProgress({ agentId: reviewerRole, agentName: reviewerName, status: 'reviewing', taskId: reviewTask.id })
-
-      try {
-        const reviewResult = await this.taskExecutor.reviewTask(reviewTask, reviewer, artifact, onProgress)
-        tasksReviewed++
-
-        // If approved, trigger chain reaction
-        if (reviewResult.verdict === 'APPROVED') {
-          tasksCompleted++
-          if (!this._aborted) {
-            const chain = await this.onTaskCompleted(reviewTask.id, onProgress)
-            if (chain) {
-              tasksCreated += chain.tasksCreated
-              tasksCompleted += chain.tasksCompleted
-            }
-          }
-        }
-      } catch (err) {
-        console.warn(`Review failed for task ${reviewTask.id}:`, err.message)
-      }
-
-      if (!this._aborted) await new Promise(r => setTimeout(r, 500))
-    }
-
-    // 7. Update PROGRESS.md
+    // Update PROGRESS.md
     const progressEntry = `## Цикл Heartbeat — ${new Date().toLocaleString('ru-RU')}
+Выполнено задач: ${tasksExecuted}
+Ревью: ${tasksReviewed}
+Завершено: ${tasksCompleted}
+Создано: ${tasksCreated}
 Опрошено: ${results.length} агентов
-Задач выполнено: ${tasksExecuted}
-Задач на ревью: ${tasksReviewed}
-Завершено задач: ${tasksCompleted}
-Создано задач: ${tasksCreated}
 ${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')}
 `
     const currentProgress = this.state.memoryFiles?.PROGRESS || ''
     this.dispatch({
       type: 'UPDATE_MEMORY_FILE',
-      payload: {
-        key: 'PROGRESS',
-        value: progressEntry + '\n' + currentProgress,
-      },
+      payload: { key: 'PROGRESS', value: progressEntry + '\n' + currentProgress },
     })
 
     this._running = false
@@ -600,7 +588,7 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       } catch {
         responseText = generateMockHeartbeat(agent, tasks || [], project || {})
       }
-      if (!responseText.includes('STATUS:')) {
+      if (!responseText || !responseText.trim()) {
         responseText = generateMockHeartbeat(agent, tasks || [], project || {})
       }
 
@@ -628,8 +616,8 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
         }
       }
 
-      // Create new tasks
-      for (const req of parsed.newTaskRequests) {
+      // Create new tasks — limited to 2 per agent in chain reaction
+      for (const req of parsed.newTaskRequests.slice(0, 2)) {
         const currentTasks = this.state.tasks || []
         const newId = `T-${String(currentTasks.length + 1).padStart(3, '0')}`
         let assignee = req.assignTo

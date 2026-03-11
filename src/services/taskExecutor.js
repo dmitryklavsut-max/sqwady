@@ -859,7 +859,11 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
     const roleMap = ROLE_ARTIFACT_MAP[role] || ROLE_ARTIFACT_MAP.pm
     const expectedType = plan.artifactType || roleMap.label
 
-    // 4. Build execution prompt (PromptBuilder provides system context + SOP + CoT via chatWithAgent)
+    // 4. Build execution prompt with full project context
+    const projectMd = memoryFiles?.PROJECT || ''
+    const archMd = memoryFiles?.ARCHITECTURE || ''
+    const agentMemory = memoryFiles?.agents?.[role]?.memory || ''
+
     const executionPrompt = `Выполни задачу и создай ПОЛНЫЙ артефакт.
 
 ЗАДАЧА:
@@ -867,17 +871,27 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
 Описание: ${task.description || 'Нет описания'}
 Приоритет: ${task.priority || 'P1'}
 
+КОНТЕКСТ ПРОЕКТА:
+${projectMd ? projectMd.slice(0, 1500) : `Проект: ${project?.name || 'Проект'}, стадия: ${project?.stage || 'MVP'}, стек: ${project?.techStack || ''}, аудитория: ${project?.audience || ''}, бизнес-модель: ${project?.businessModel || ''}`}
+
+${archMd ? `АРХИТЕКТУРА:\n${archMd.slice(0, 1000)}` : ''}
+
+${agentMemory ? `ТВОЯ ПРЕДЫДУЩАЯ РАБОТА:\n${agentMemory.slice(-500)}` : ''}
+
 ИНСТРУКЦИЯ:
-Следуй SOP своей роли и фреймворку рассуждений.
-Создай ПОЛНЫЙ, ДЕТАЛЬНЫЙ артефакт. Не резюме, не план — а РЕАЛЬНЫЙ результат работы.
-Для кода — пиши реальный код. Для документов — пиши полный документ.
-Для спецификаций — пиши детальную спецификацию.
+Создай ПОЛНЫЙ, ДЕТАЛЬНЫЙ артефакт. НЕ резюме, НЕ план, НЕ статус-отчёт — а РЕАЛЬНЫЙ результат работы.
+Минимум 200 слов содержательного контента.
+Для кода — пиши реальный работающий код с комментариями.
+Для документов — пиши полный документ со всеми разделами.
+Для спецификаций — пиши детальную спецификацию с примерами.
+Для дизайна — пиши детальное описание wireframe и design tokens.
+Для анализа — пиши аналитику с данными и выводами.
 
 Формат ответа СТРОГО:
-ARTIFACT_TITLE: {название артефакта}
+ARTIFACT_TITLE: {описательное название артефакта}
 ARTIFACT_TYPE: {code|document|spec|design|analysis}
 CONTENT:
-{полное содержимое артефакта}`
+{ПОЛНЫЙ АРТЕФАКТ — это главный результат твоей работы}`
 
     // 5. Call API or generate mock
     let artifact
@@ -1264,15 +1278,23 @@ SCORE: {число от 1 до 10}`
   }
 
   // Find the next task for an agent to work on
+  // Priority: in_progress first (continue work), then todo by priority
   pickNextTask(agentRole) {
     const tasks = this.state.tasks || []
-    // Priority order: P0 > P1 > P2 > P3
     const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 }
-    const candidates = tasks
+
+    // First: continue in_progress tasks (already started, needs to finish)
+    const inProgress = tasks
+      .filter(t => t.assignee === agentRole && t.column === 'in_progress' && !t.frozen)
+      .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
+    if (inProgress.length > 0) return inProgress[0]
+
+    // Second: pick from todo by priority
+    const todo = tasks
       .filter(t => t.assignee === agentRole && t.column === 'todo' && !t.frozen)
       .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
 
-    return candidates[0] || null
+    return todo[0] || null
   }
 
   // Find tasks ready for review
