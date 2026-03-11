@@ -6,13 +6,16 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' })
+    console.error('Chat proxy: ANTHROPIC_API_KEY is not set')
+    return res.status(500).json({ error: 'API key not configured. Set ANTHROPIC_API_KEY in Vercel environment variables.' })
   }
 
   const { systemPrompt, messages, model, temperature } = req.body
   if (!systemPrompt || !messages) {
     return res.status(400).json({ error: 'Missing systemPrompt or messages' })
   }
+
+  console.log(`Chat proxy: model=${model || 'claude-sonnet-4-20250514'}, systemPrompt=${systemPrompt.length} chars, messages=${messages.length}`)
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -24,7 +27,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model: model || 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 2048,
         temperature: temperature ?? 0.5,
         system: systemPrompt,
         messages,
@@ -33,12 +36,14 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const err = await response.text()
-      console.error('Anthropic API error:', err)
-      return res.status(response.status).json({ error: 'Anthropic API error' })
+      console.error('Anthropic API error:', response.status, err)
+      return res.status(response.status).json({ error: `Anthropic API error: ${response.status}` })
     }
 
     const data = await response.json()
     const text = data.content?.[0]?.text || ''
+
+    console.log(`Chat proxy success: ${text.substring(0, 80)}...`)
 
     return res.status(200).json({ reply: text })
   } catch (err) {

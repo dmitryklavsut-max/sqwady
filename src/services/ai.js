@@ -72,6 +72,8 @@ export async function chatWithAgent(agent, userMessage, context, dispatch, getSt
   const temperature = analyticalRoles.includes(role) ? 0.3 : 0.7
 
   try {
+    console.log(`AI API call: agent=${agent.personality?.name || role}, role=${role}, model=${agent.model || MODEL}`)
+
     const res = await fetch(CHAT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -88,6 +90,8 @@ export async function chatWithAgent(agent, userMessage, context, dispatch, getSt
     const data = await res.json()
     const reply = data.reply || 'Не удалось получить ответ.'
 
+    console.log(`AI API success: ${reply.substring(0, 100)}...`)
+
     // Process memory tags from response
     if (dispatch && getState) {
       processMemoryTags(reply, role, dispatch, getState)
@@ -95,7 +99,7 @@ export async function chatWithAgent(agent, userMessage, context, dispatch, getSt
 
     return reply
   } catch (err) {
-    console.warn('Chat API unavailable, using fallback:', err.message)
+    console.warn(`AI API failed: ${err.message}, using fallback`)
     return generateFallbackChat(agent, userMessage, context)
   }
 }

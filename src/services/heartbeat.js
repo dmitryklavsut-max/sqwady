@@ -263,8 +263,9 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
       responseText = generateMockHeartbeat(agent, tasks || [], project || {})
     }
 
-    // If response looks like a free-form chat reply (no STATUS: prefix), it's from fallback
-    if (!responseText.includes('STATUS:')) {
+    // Accept ANY non-empty AI response — only use mock if response is truly empty
+    if (!responseText || !responseText.trim()) {
+      console.warn(`Heartbeat: empty response for ${agentName}, using mock`)
       responseText = generateMockHeartbeat(agent, tasks || [], project || {})
     }
 
@@ -318,13 +319,31 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
 
       // 1. Process completed tasks — move matching tasks to "done"
       for (const completed of result.completedTasks) {
-        // Try to match by task ID (e.g., "T-001 (description)")
+        let matched = false
+
+        // Try exact ID match first (e.g., "T-001")
         const taskIdMatch = completed.match(/T-\d+/)
         if (taskIdMatch) {
           const existingTask = (tasks || []).find(t => t.id === taskIdMatch[0] && t.column !== 'done')
           if (existingTask) {
             this.dispatch({ type: 'UPDATE_TASK', payload: { id: existingTask.id, column: 'done' } })
             tasksCompleted++
+            matched = true
+          }
+        }
+
+        // Fuzzy match: compare completed text with task titles assigned to this agent
+        if (!matched) {
+          const completedLower = completed.toLowerCase()
+          const agentTasks = (tasks || []).filter(t => t.assignee === role && t.column !== 'done')
+          for (const t of agentTasks) {
+            const titleWords = t.title.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+            const matchCount = titleWords.filter(w => completedLower.includes(w)).length
+            if (matchCount >= 2 || (titleWords.length <= 2 && matchCount >= 1)) {
+              this.dispatch({ type: 'UPDATE_TASK', payload: { id: t.id, column: 'done' } })
+              tasksCompleted++
+              break
+            }
           }
         }
       }
