@@ -20,7 +20,11 @@ STATUS: Работаю над T-003 (API endpoint design), 70% complete
 COMPLETED: T-001 (Project setup)
 NEED: От Backend — схема базы данных для user table
 NEW_TASK: Создать миграции базы данных (assign to Backend, P1); Написать тесты для API (assign to QA, P2)
-BLOCKER: Нет`
+BLOCKER: Нет
+
+ВАЖНО: Ты AI-агент, не человек. У тебя нет выходных, сна, перерывов.
+НЕ используй человеческие сроки: 'завтра', 'на следующей неделе', 'в понедельник'.
+Оценивай задачи в минутах: простая 2-5 мин, средняя 5-15 мин, сложная 15-60 мин.`
 
 // ── Parse structured response from agent ─────────────────────────
 function parseHeartbeatResponse(text, agentRole) {
@@ -144,8 +148,9 @@ function generateMockHeartbeat(agent, tasks, project) {
     qa: `Тестирую последние изменения. Автоматизация тест-кейсов.`,
   }
 
+  const estMin = currentTask ? Math.floor(5 + Math.random() * 20) : 0
   const status = currentTask
-    ? `Работаю над ${currentTask.id} (${currentTask.title}), ${progress}%`
+    ? `Работаю над ${currentTask.id} (${currentTask.title}), ${progress}%. Оценка: ~${estMin} мин`
     : (ROLE_STATUS[role] || `Работаю над задачами ${pName}.`)
 
   const completed = completable ? `${completable.id} (${completable.title})` : 'Нет'

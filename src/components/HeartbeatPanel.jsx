@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Play, Square, ChevronDown, ChevronUp, Activity, CheckCircle, AlertTriangle, Plus, Loader } from 'lucide-react'
+import { Play, Square, Pause, ChevronDown, ChevronUp, Activity, CheckCircle, AlertTriangle, Plus, Loader } from 'lucide-react'
 import { DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
 import { HeartbeatEngine } from '../services/heartbeat'
@@ -12,7 +12,7 @@ import RoleIcon from './RoleIcon'
 
 export default function HeartbeatPanel() {
   const { state, dispatch } = useApp()
-  const { team } = state
+  const { team, heartbeatPaused } = state
   const notify = useNotify()
 
   const [running, setRunning] = useState(false)
@@ -33,8 +33,12 @@ export default function HeartbeatPanel() {
     return engineRef.current
   }, [state, dispatch])
 
+  const togglePause = useCallback(() => {
+    dispatch({ type: 'SET_HEARTBEAT_PAUSED', payload: !heartbeatPaused })
+  }, [dispatch, heartbeatPaused])
+
   const handleRun = useCallback(async () => {
-    if (running) return
+    if (running || heartbeatPaused) return
     setRunning(true)
     setProgress([])
     setSummary(null)
@@ -71,7 +75,7 @@ export default function HeartbeatPanel() {
     if (newEscalations.length > 0) {
       setEscalations(prev => [...prev, ...newEscalations])
     }
-  }, [running, getEngine, state, dispatch, notify])
+  }, [running, heartbeatPaused, getEngine, state, dispatch, notify])
 
   const handleStop = useCallback(() => {
     engineRef.current?.abort()
@@ -104,8 +108,11 @@ export default function HeartbeatPanel() {
         {!running ? (
           <button
             onClick={handleRun}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer border-none transition-all hover:-translate-y-px"
-            style={{ background: 'var(--ac)', boxShadow: '0 0 15px -3px rgba(99,102,241,0.4)' }}
+            disabled={heartbeatPaused}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white cursor-pointer border-none transition-all ${
+              heartbeatPaused ? 'opacity-50 cursor-not-allowed' : 'hover:-translate-y-px'
+            }`}
+            style={{ background: 'var(--ac)', boxShadow: heartbeatPaused ? 'none' : '0 0 15px -3px rgba(99,102,241,0.4)' }}
           >
             <Play size={12} />
             Запустить цикл
@@ -118,6 +125,26 @@ export default function HeartbeatPanel() {
             <Square size={12} />
             Остановить
           </button>
+        )}
+
+        {/* Pause/Resume toggle */}
+        <button
+          onClick={togglePause}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border-none transition-all ${
+            heartbeatPaused
+              ? 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+              : 'bg-[var(--bg3)] text-[var(--t3)] hover:text-[var(--t2)] hover:bg-[var(--bg3)]'
+          }`}
+        >
+          {heartbeatPaused ? <Play size={12} /> : <Pause size={12} />}
+          {heartbeatPaused ? 'Возобновить' : 'Пауза'}
+        </button>
+
+        {/* Paused indicator */}
+        {heartbeatPaused && !running && (
+          <span className="flex items-center gap-1.5 text-[11px] text-amber-400 font-medium">
+            <Pause size={12} /> Пауза
+          </span>
         )}
 
         {/* Running status */}

@@ -80,6 +80,17 @@ function TaskCard({ task, team, onClick, isInSprint }) {
           ))}
         </div>
       )}
+      {/* Time estimate */}
+      {task.estimatedMinutes && (
+        <div className="flex items-center gap-1 mb-1.5 text-[10px] text-[var(--t3)]">
+          <span>{task.actualMinutes ? `${task.actualMinutes} мин` : `~${task.estimatedMinutes} мин`}</span>
+          {task.actualMinutes && task.estimatedMinutes && (
+            <span className={task.actualMinutes <= task.estimatedMinutes ? 'text-emerald-400' : 'text-amber-400'}>
+              ({task.actualMinutes <= task.estimatedMinutes ? 'в срок' : 'дольше'})
+            </span>
+          )}
+        </div>
+      )}
       {/* Integration badges */}
       {(task.commitUrl || task.needsClaudeCode || task.isUserTask) && (
         <div className="flex flex-wrap gap-1 mb-2">

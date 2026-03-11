@@ -9,9 +9,32 @@ export default function RoadmapView() {
   const { state, dispatch } = useApp()
   const roadmap = state.roadmap || []
   const sprints = state.sprints || []
+  const tasks = state.tasks || []
   const currentSprintId = state.currentSprintId
   const [hover, setHover] = useState(null)
   const [editing, setEditing] = useState(null) // index
+
+  // Calculate estimated minutes per phase from sprint tasks
+  const phaseEstimates = useMemo(() => {
+    const estimates = {}
+    for (const sprint of sprints) {
+      const sprintTasks = tasks.filter(t => sprint.taskIds.includes(t.id))
+      const phase = sprint.phase
+      if (!estimates[phase]) estimates[phase] = { totalMin: 0, doneMin: 0, overflows: false }
+      for (const t of sprintTasks) {
+        estimates[phase].totalMin += t.estimatedMinutes || 0
+        if (t.column === 'done') estimates[phase].doneMin += t.actualMinutes || t.estimatedMinutes || 0
+      }
+    }
+    // Check if any phase has tasks exceeding sprint capacity (14 days * 24h * 60min per agent)
+    for (const key of Object.keys(estimates)) {
+      const e = estimates[key]
+      const phaseSprints = sprints.filter(s => s.phase === key)
+      const sprintCapMin = phaseSprints.length * 14 * 24 * 60 // max continuous capacity
+      if (e.totalMin > sprintCapMin && sprintCapMin > 0) e.overflows = true
+    }
+    return estimates
+  }, [sprints, tasks])
 
   // Current sprint date range for overlay
   const currentSprint = useMemo(
@@ -87,9 +110,21 @@ export default function RoadmapView() {
               onMouseLeave={() => setHover(null)}
               onClick={() => openEdit(idx)}
             >
-              <div className="min-w-0 overflow-hidden">
-                <div className="text-[13px] font-bold truncate" style={{ color: r.color }}>
-                  {r.phase}
+              <div className="min-w-0 overflow-hidden flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="text-[13px] font-bold truncate" style={{ color: r.color }}>
+                    {r.phase}
+                  </div>
+                  {phaseEstimates[r.id]?.totalMin > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full shrink-0"
+                      style={{
+                        background: phaseEstimates[r.id].overflows ? 'rgba(239,68,68,0.15)' : 'rgba(99,102,241,0.12)',
+                        color: phaseEstimates[r.id].overflows ? '#ef4444' : 'var(--ac)',
+                      }}>
+                      {phaseEstimates[r.id].doneMin}/{phaseEstimates[r.id].totalMin} мин
+                      {phaseEstimates[r.id].overflows && ' !!'}
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px] text-[var(--t2)] mt-0.5 truncate">
                   {(r.items || []).join(', ')}

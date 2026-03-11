@@ -723,17 +723,107 @@ export class TaskExecutor {
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'in_progress' })
 
-    // 2. Determine artifact type
-    const roleMap = ROLE_ARTIFACT_MAP[role] || ROLE_ARTIFACT_MAP.pm
-    const expectedType = roleMap.label
+    const startedAt = Date.now()
 
-    // 3. Build execution prompt
+    // 2. PLAN phase — agent creates execution plan
+    const agentSkills = (agent.personality?.skills || []).join(', ') || desk?.bio || role
+    const planPrompt = `Ты ${agentName} (${desk?.label || role}). Ты получил задачу: "${task.title}". ${task.description || ''}
+Проект: ${project?.name || 'Проект'}. Стек: ${project?.techStack || ''}.
+Твои навыки: ${agentSkills}.
+
+Создай план выполнения:
+PLAN:
+- Шаг 1: {описание} (~{минуты} мин)
+- Шаг 2: {описание} (~{минуты} мин)
+- Шаг 3: {описание} (~{минуты} мин)
+TOTAL_ESTIMATE: {общее количество минут} мин
+DEPENDENCIES: {что нужно от других агентов, или 'none'}
+ARTIFACT_TYPE: {code|document|spec|design|analysis}
+
+Основывай оценку на реальной сложности:
+- Простой конфиг/документ: 2-5 мин
+- API спецификация или компонент: 5-15 мин
+- Полный модуль или архитектура: 15-30 мин
+- Сложная многокомпонентная фича: 30-60 мин
+Ты AI-агент — без сна и перерывов. Но сложный анализ и генерация требуют времени.`
+
+    let plan = null
+    let estimatedMinutes = 10
+    try {
+      const planContext = { recentMessages: [], project: project || {}, memoryFiles: memoryFiles || {} }
+      const planText = await chatWithAgent(agent, planPrompt, planContext)
+
+      // Parse plan
+      const planSteps = []
+      const stepMatches = planText.matchAll(/[-•]\s*(?:Шаг\s*\d+[:.]\s*)?(.+?)(?:\(~?(\d+)\s*мин\))?$/gm)
+      for (const m of stepMatches) {
+        planSteps.push({ step: m[1].trim(), minutes: parseInt(m[2]) || 5 })
+      }
+      const totalMatch = planText.match(/TOTAL_ESTIMATE:\s*(\d+)/i)
+      const depsMatch = planText.match(/DEPENDENCIES:\s*(.+?)(?:\n|$)/i)
+      const typeMatch = planText.match(/ARTIFACT_TYPE:\s*(\w+)/i)
+
+      estimatedMinutes = totalMatch ? parseInt(totalMatch[1]) : planSteps.reduce((s, p) => s + p.minutes, 0) || 10
+      plan = {
+        steps: planSteps.length > 0 ? planSteps : [{ step: 'Выполнить задачу', minutes: estimatedMinutes }],
+        totalMinutes: estimatedMinutes,
+        dependencies: depsMatch && !/none|нет/i.test(depsMatch[1]) ? depsMatch[1].trim() : null,
+        artifactType: typeMatch ? typeMatch[1].trim().toLowerCase() : null,
+      }
+    } catch {
+      // Mock plan based on role
+      const ROLE_ESTIMATES = { ceo: 8, cto: 15, back: 12, front: 10, mob: 12, ml: 20, ops: 8, des: 10, mrk: 8, wr: 6, pm: 8, qa: 10 }
+      estimatedMinutes = ROLE_ESTIMATES[role] || 10
+      plan = {
+        steps: [
+          { step: 'Анализ требований', minutes: Math.ceil(estimatedMinutes * 0.2) },
+          { step: 'Разработка решения', minutes: Math.ceil(estimatedMinutes * 0.6) },
+          { step: 'Финализация и проверка', minutes: Math.ceil(estimatedMinutes * 0.2) },
+        ],
+        totalMinutes: estimatedMinutes,
+        dependencies: null,
+        artifactType: null,
+      }
+    }
+
+    // Save plan to task
+    this.dispatch({
+      type: 'UPDATE_TASK',
+      payload: { id: task.id, plan, estimatedMinutes, startedAt: new Date(startedAt).toISOString() },
+    })
+
+    // Post plan to Meeting Room
+    const planStepsText = plan.steps.map((s, i) => `${i + 1}. ${s.step} (~${s.minutes} мин)`).join('\n')
+    this.dispatch({
+      type: 'ADD_MESSAGE',
+      payload: {
+        channel: 'meeting',
+        message: {
+          id: `plan-${Date.now()}-${role}`,
+          from: role,
+          name: agentName,
+          text: `Взял задачу "${task.title}".\nПлан:\n${planStepsText}\nОценка: ${estimatedMinutes} мин.${plan.dependencies ? `\nЗависимости: ${plan.dependencies}` : ''}`,
+          time: timestamp(),
+          taskExecution: true,
+        },
+      },
+    })
+
+    if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'planned', plan, estimatedMinutes })
+
+    // 3. Determine artifact type
+    const roleMap = ROLE_ARTIFACT_MAP[role] || ROLE_ARTIFACT_MAP.pm
+    const expectedType = plan.artifactType || roleMap.label
+
+    // 4. Build execution prompt
     const agentMem = memoryFiles?.agents?.[role]
     const projectDoc = memoryFiles?.PROJECT || ''
     const archDoc = memoryFiles?.ARCHITECTURE || ''
     const agentMemory = agentMem?.memory || ''
 
     const executionPrompt = `Ты ${agentName} (${desk?.label || role}). Выполни эту задачу и создай ПОЛНЫЙ артефакт.
+
+ВАЖНО: Ты AI-агент, не человек. Оценивай сроки в минутах, не днях.
 
 ЗАДАЧА:
 Название: ${task.title}
@@ -761,7 +851,7 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
 CONTENT:
 {полное содержимое артефакта}`
 
-    // 4. Call API or generate mock
+    // 5. Call API or generate mock
     let artifact
     try {
       const context = { recentMessages: [], project: project || {}, memoryFiles: memoryFiles || {} }
@@ -777,9 +867,13 @@ CONTENT:
       artifact.type = expectedType
     }
 
+    // Record actual execution time
+    const finishedAt = Date.now()
+    const actualMinutes = Math.round((finishedAt - startedAt) / 60000) || 1
+
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'artifact_created', artifact })
 
-    // 5. Save artifact to state
+    // 6. Save artifact to state
     const artifactRecord = {
       id: `ART-${Date.now()}-${role}`,
       taskId: task.id,
@@ -790,7 +884,15 @@ CONTENT:
       content: artifact.content,
       createdAt: new Date().toISOString(),
       status: 'pending_review',
+      actualMinutes,
+      estimatedMinutes,
     }
+
+    // Update task with timing info
+    this.dispatch({
+      type: 'UPDATE_TASK',
+      payload: { id: task.id, actualMinutes, finishedAt: new Date(finishedAt).toISOString() },
+    })
 
     this.dispatch({ type: 'ADD_ARTIFACT', payload: artifactRecord })
 
@@ -918,6 +1020,7 @@ CONTENT:
     const meetingParts = [
       `**Задача выполнена:** ${task.title}`,
       `Артефакт: "${artifact.title}" (${artifact.type})`,
+      `Время: ${actualMinutes} мин (оценка: ${estimatedMinutes} мин)`,
       `Ревью: ${DESKS.find(d => d.id === reviewerRole)?.label || reviewerRole}`,
     ]
     if (commitUrl) meetingParts.push(`GitHub: ${commitUrl}`)

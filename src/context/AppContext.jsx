@@ -29,6 +29,7 @@ const initialState = {
   },
   recommendations: null,
   github: { connected: false, token: '', owner: '', repo: '' },
+  heartbeatPaused: false,
 }
 
 function loadState() {
@@ -104,6 +105,8 @@ function reducer(state, action) {
           [action.payload.key]: action.payload.value,
         },
       }
+    case 'SET_HEARTBEAT_PAUSED':
+      return { ...state, heartbeatPaused: action.payload }
     case 'SET_GITHUB':
       return { ...state, github: { ...state.github, ...action.payload } }
     case 'ADD_ARTIFACT':

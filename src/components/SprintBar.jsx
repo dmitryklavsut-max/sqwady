@@ -67,13 +67,27 @@ export default function SprintBar() {
   }
 
   // Task breakdown by agent for expanded view
+  // Estimated minutes remaining
+  const sprintMinutes = useMemo(() => {
+    if (!sprint) return { total: 0, completed: 0, remaining: 0 }
+    const sprintTasks = (tasks || []).filter(t => sprint.taskIds.includes(t.id))
+    let total = 0, completed = 0
+    for (const t of sprintTasks) {
+      const est = t.estimatedMinutes || 0
+      total += est
+      if (t.column === 'done') completed += t.actualMinutes || est
+    }
+    return { total, completed, remaining: Math.max(0, total - completed) }
+  }, [sprint, tasks])
+
   const agentBreakdown = useMemo(() => {
     if (!sprint) return []
     const sprintTasks = (tasks || []).filter(t => sprint.taskIds.includes(t.id))
     const byAgent = {}
     for (const t of sprintTasks) {
-      if (!byAgent[t.assignee]) byAgent[t.assignee] = { total: 0, done: 0 }
+      if (!byAgent[t.assignee]) byAgent[t.assignee] = { total: 0, done: 0, estMin: 0 }
       byAgent[t.assignee].total++
+      byAgent[t.assignee].estMin += t.estimatedMinutes || 0
       if (t.column === 'done') byAgent[t.assignee].done++
     }
     return Object.entries(byAgent).map(([role, counts]) => {
@@ -119,6 +133,11 @@ export default function SprintBar() {
           <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--bg3)] text-[var(--t2)] font-medium whitespace-nowrap">
             {daysLeft} дн.
           </span>
+          {sprintMinutes.remaining > 0 && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-[var(--ac)]/10 text-[var(--ac)] font-medium whitespace-nowrap">
+              ~{sprintMinutes.remaining} мин
+            </span>
+          )}
         </div>
 
         {/* Right: status + expand */}
