@@ -756,6 +756,7 @@ export class TaskExecutor {
 
   // Execute a task: agent produces real output
   async executeTask(task, agent, onProgress) {
+    console.log(`executeTask START: ${task.id} "${task.title}" assignee: ${task.assignee} column: ${task.column}`)
     const role = agent.role || agent.id
     const agentName = agent.personality?.name || agent.label
     const desk = DESKS.find(d => d.id === role)
@@ -790,6 +791,7 @@ export class TaskExecutor {
     }
 
     // 1. Move task to "In Progress"
+    console.log(`executeTask [${task.id}]: Moving to in_progress`)
     emitProgress('analyzing', 0, `Анализ задачи: "${task.title}"`)
 
     this.dispatch({
@@ -820,8 +822,10 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
     let plan = null
     let estimatedMinutes = 10
     try {
+      console.log(`executeTask [${task.id}]: Calling API for plan...`)
       const planContext = { recentMessages: [], project: project || {}, memoryFiles: memoryFiles || {} }
       const planText = await chatWithAgent(agent, planPrompt, planContext)
+      console.log(`executeTask [${task.id}]: Plan received:`, planText?.substring(0, 100))
 
       // Parse plan
       const planSteps = []
@@ -840,7 +844,8 @@ ARTIFACT_TYPE: {code|document|spec|design|analysis}
         dependencies: depsMatch && !/none|нет/i.test(depsMatch[1]) ? depsMatch[1].trim() : null,
         artifactType: typeMatch ? typeMatch[1].trim().toLowerCase() : null,
       }
-    } catch {
+    } catch (planErr) {
+      console.error(`executeTask [${task.id}] ERROR at step: plan API call`, planErr.message)
       // Mock plan based on role
       const ROLE_ESTIMATES = { ceo: 8, cto: 15, back: 12, front: 10, mob: 12, ml: 20, ops: 8, des: 10, mrk: 8, wr: 6, pm: 8, qa: 10 }
       estimatedMinutes = ROLE_ESTIMATES[role] || 10
@@ -929,15 +934,20 @@ CONTENT:
 {ПОЛНЫЙ АРТЕФАКТ — это главный результат твоей работы}`
 
     // 5. Call API or generate mock
+    console.log(`executeTask [${task.id}]: Calling API for artifact...`)
     emitProgress('executing', 70, 'Генерация артефакта...')
     let artifact
     try {
       const context = { recentMessages: [], project: project || {}, memoryFiles: memoryFiles || {} }
       const responseText = await chatWithAgent(agent, executionPrompt, context)
+      console.log(`executeTask [${task.id}]: Artifact response received, length: ${responseText?.length}`)
       artifact = parseArtifact(responseText)
-    } catch {
+      console.log(`executeTask [${task.id}]: Artifact parsed: title="${artifact.title}" type=${artifact.type} content.length=${artifact.content?.length}`)
+    } catch (artErr) {
+      console.error(`executeTask [${task.id}] ERROR at step: artifact API call`, artErr.message)
       // Fallback: generate template artifact
       artifact = generateMockArtifact(task, agent, project || {})
+      console.log(`executeTask [${task.id}]: Using mock artifact: "${artifact.title}"`)
     }
 
     // Ensure artifact has valid type
@@ -976,6 +986,7 @@ CONTENT:
 
     this.dispatch({ type: 'ADD_ARTIFACT', payload: artifactRecord })
 
+    console.log(`executeTask [${task.id}]: Saving to Wiki...`)
     emitProgress('saving', 90, 'Сохранение артефакта в Wiki и память...')
 
     // 6. Add as Wiki page
@@ -1084,6 +1095,7 @@ CONTENT:
     }
 
     // 11. Move task to "Review"
+    console.log(`executeTask [${task.id}]: Moving to review`)
     const reviewerRole = getReviewerRole(task, role)
     this.dispatch({
       type: 'UPDATE_TASK',
@@ -1135,6 +1147,7 @@ CONTENT:
 
     if (onProgress) onProgress({ taskId: task.id, agentId: role, status: 'review', reviewerRole })
 
+    console.log(`executeTask COMPLETE: ${task.id} "${task.title}" → review (reviewer: ${reviewerRole})`)
     return { task, artifact: artifactRecord, reviewerRole, commitUrl, claudeCodePrompt }
 
   }
@@ -1333,18 +1346,31 @@ SCORE: {число от 1 до 10}`
     const tasks = this.state.tasks || []
     const priorityOrder = { P0: 0, P1: 1, P2: 2, P3: 3 }
 
+    const allForAgent = tasks.filter(t => t.assignee === agentRole)
+    const todoCount = allForAgent.filter(t => t.column === 'todo' && !t.frozen).length
+    const ipCount = allForAgent.filter(t => t.column === 'in_progress' && !t.frozen).length
+    const reviewCount = allForAgent.filter(t => t.column === 'review').length
+    const doneCount = allForAgent.filter(t => t.column === 'done').length
+    const frozenCount = allForAgent.filter(t => t.frozen).length
+    console.log(`pickNextTask for role: ${agentRole} | total: ${allForAgent.length} | todo: ${todoCount}, in_progress: ${ipCount}, review: ${reviewCount}, done: ${doneCount}, frozen: ${frozenCount}`)
+
     // First: continue in_progress tasks (already started, needs to finish)
     const inProgress = tasks
       .filter(t => t.assignee === agentRole && t.column === 'in_progress' && !t.frozen)
       .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
-    if (inProgress.length > 0) return inProgress[0]
+    if (inProgress.length > 0) {
+      console.log(`pickNextTask for role: ${agentRole} found in_progress: ${inProgress[0].id} "${inProgress[0].title}"`)
+      return inProgress[0]
+    }
 
     // Second: pick from todo by priority
     const todo = tasks
       .filter(t => t.assignee === agentRole && t.column === 'todo' && !t.frozen)
       .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
 
-    return todo[0] || null
+    const picked = todo[0] || null
+    console.log(`pickNextTask for role: ${agentRole} found: ${picked?.id || 'NONE'}${picked ? ` "${picked.title}"` : ''}`)
+    return picked
   }
 
   // Find tasks ready for review

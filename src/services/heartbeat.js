@@ -309,29 +309,34 @@ ${HEARTBEAT_SYSTEM_SUFFIX}`
     })
 
     // ── PHASE 1: EXECUTE — each agent works on their highest-priority task ──
-    console.log('Heartbeat Phase 1: EXECUTE')
+    console.log('=== PHASE 1: EXECUTE ===')
+    console.log('Team size:', sorted.length, 'agents:', sorted.map(a => a.personality?.name || a.label).join(', '))
     for (const agent of sorted) {
       if (this._aborted) break
 
       const role = agent.role || agent.id
       const agentName = agent.personality?.name || agent.label
 
+      console.log(`Agent ${agentName} (${role}) - looking for task...`)
+
       // Pick next task: in_progress first (continue work), then todo
       const nextTask = this.taskExecutor.pickNextTask(role)
       if (nextTask) {
-        console.log(`Execute: ${agentName} → ${nextTask.id} "${nextTask.title}" [${nextTask.column}]`)
+        console.log(`Found task: ${nextTask.id} "${nextTask.title}" column: ${nextTask.column} priority: ${nextTask.priority}`)
+        console.log(`>>> CALLING executeTask for ${nextTask.id}`)
         if (onProgress) onProgress({ agentId: role, agentName, status: 'executing', taskId: nextTask.id })
 
         try {
           await this.taskExecutor.executeTask(nextTask, agent, onProgress)
           tasksExecuted++
+          console.log(`<<< executeTask COMPLETED for ${nextTask.id}, tasksExecuted: ${tasksExecuted}`)
         } catch (err) {
-          console.warn(`Task execution failed for ${agentName}:`, err.message)
+          console.error(`executeTask FAILED for ${nextTask.id}:`, err.message, err.stack)
         }
 
         if (!this._aborted) await new Promise(r => setTimeout(r, 500))
       } else {
-        console.log(`Execute: ${agentName} — no tasks to execute`)
+        console.log(`No task found for agent ${agentName} (${role})`)
       }
     }
 
