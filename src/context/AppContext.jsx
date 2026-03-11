@@ -96,6 +96,17 @@ function reducer(state, action) {
       return { ...state, pitchSlides: action.payload }
     case 'SET_WIKI_PAGES':
       return { ...state, wikiPages: action.payload }
+    case 'ADD_WIKI_PAGE': {
+      const existing = state.wikiPages || []
+      const idx = existing.findIndex(p => p.title === action.payload.title)
+      if (idx >= 0) {
+        // Update existing page with same title
+        const updated = [...existing]
+        updated[idx] = { ...updated[idx], ...action.payload }
+        return { ...state, wikiPages: updated }
+      }
+      return { ...state, wikiPages: [...existing, action.payload] }
+    }
     case 'SET_MEMORY_FILES':
       return { ...state, memoryFiles: action.payload }
     case 'UPDATE_MEMORY_FILE':

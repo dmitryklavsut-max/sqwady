@@ -989,22 +989,18 @@ CONTENT:
     console.log(`executeTask [${task.id}]: Saving to Wiki...`)
     emitProgress('saving', 90, 'Сохранение артефакта в Wiki и память...')
 
-    // 6. Add as Wiki page
-    const currentPages = this.state.wikiPages || []
+    // 6. Add as Wiki page (atomic append via reducer — no stale state issues)
     this.dispatch({
-      type: 'SET_WIKI_PAGES',
-      payload: [
-        ...currentPages,
-        {
-          title: `[${artifact.type.toUpperCase()}] ${artifact.title}`,
-          iconName: artifact.type === 'code' ? 'Code' : artifact.type === 'design' ? 'Palette' : 'FileText',
-          text: artifact.content,
-          artifactId: artifactRecord.id,
-          agentId: role,
-          taskId: task.id,
-          createdAt: artifactRecord.createdAt,
-        },
-      ],
+      type: 'ADD_WIKI_PAGE',
+      payload: {
+        title: `[${artifact.type.toUpperCase()}] ${artifact.title}`,
+        iconName: artifact.type === 'code' ? 'Code' : artifact.type === 'design' ? 'Palette' : 'FileText',
+        text: artifact.content,
+        artifactId: artifactRecord.id,
+        agentId: role,
+        taskId: task.id,
+        createdAt: artifactRecord.createdAt,
+      },
     })
 
     // 7. Update agent memory
