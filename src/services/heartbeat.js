@@ -1,5 +1,5 @@
 import { chatWithAgent } from './ai'
-import { DESKS, timestamp, resolveRoleId } from '../data/constants'
+import { DESKS, timestamp, resolveRoleId, normalizeAssignee } from '../data/constants'
 import { getDaysRemaining } from './sprintPlanner'
 import { TaskExecutor } from './taskExecutor'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
@@ -124,6 +124,13 @@ function buildAgentIds(role) {
   const resolved = resolveRoleId(role)
   if (resolved !== role) ids.add(resolved)
   if (REVERSE_LEGACY[role]) ids.add(REVERSE_LEGACY[role])
+  // Add snake_case label variants (e.g. "backend_developer" for role "backend")
+  const desk = DESKS.find(d => d.id === role || d.id === resolved)
+  if (desk?.label) {
+    ids.add(desk.label.toLowerCase())
+    ids.add(desk.label.toLowerCase().replace(/[\/\s]+/g, '_'))
+    ids.add(desk.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''))
+  }
   return ids
 }
 function isTaskForAgent(task, roleIds) {
@@ -131,6 +138,13 @@ function isTaskForAgent(task, roleIds) {
   const a = task.assignee.toLowerCase().trim()
   for (const id of roleIds) {
     if (a === id) return true
+  }
+  // Fallback: normalize assignee to canonical role ID
+  const normalized = normalizeAssignee(a)
+  if (normalized !== a) {
+    for (const id of roleIds) {
+      if (normalized === id) return true
+    }
   }
   return false
 }

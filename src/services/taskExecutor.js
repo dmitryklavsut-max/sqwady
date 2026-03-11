@@ -1,5 +1,5 @@
 import { chatWithAgent } from './ai'
-import { DESKS, timestamp, resolveRoleId } from '../data/constants'
+import { DESKS, timestamp, resolveRoleId, normalizeAssignee } from '../data/constants'
 import { GitHubService, getArtifactFilePath, isComplexTask } from './github'
 import { generateClaudeCodePrompt } from './claudeCodePrompts'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
@@ -1347,17 +1347,26 @@ SCORE: {число от 1 до 10}`
     const resolved = resolveRoleId(agentRole)
     if (resolved !== agentRole) ids.add(resolved)
     // Add reverse: if agentRole is a new ID, find old alias
-    // LEGACY_ID_MAP: back→backend, front→frontend, mob→mobile, ml→ml_eng, ops→devops, des→designer, mrk→marketer, wr→writer
     const REVERSE_MAP = { backend: 'back', frontend: 'front', mobile: 'mob', ml_eng: 'ml', devops: 'ops', designer: 'des', marketer: 'mrk', writer: 'wr' }
     if (REVERSE_MAP[agentRole]) ids.add(REVERSE_MAP[agentRole])
     // Also add the agent label from DESKS (e.g., 'Backend Developer')
-    const desk = DESKS.find(d => d.id === agentRole)
-    if (desk?.label) ids.add(desk.label.toLowerCase())
+    const desk = DESKS.find(d => d.id === agentRole || d.id === resolved)
+    if (desk?.label) {
+      ids.add(desk.label.toLowerCase())
+      // Add snake_case version of label: "Backend Developer" → "backend_developer"
+      ids.add(desk.label.toLowerCase().replace(/[\/\s]+/g, '_'))
+      // Also clean version: "UI/UX Designer" → "ui_ux_designer"
+      ids.add(desk.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''))
+    }
     // Also check team for personality name
     const team = this.state.team || []
     const agent = team.find(t => (t.role || t.id) === agentRole)
     if (agent?.personality?.name) ids.add(agent.personality.name.toLowerCase())
-    if (agent?.label) ids.add(agent.label.toLowerCase())
+    if (agent?.label) {
+      ids.add(agent.label.toLowerCase())
+      ids.add(agent.label.toLowerCase().replace(/[\/\s]+/g, '_'))
+      ids.add(agent.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''))
+    }
     return ids
   }
 
@@ -1365,8 +1374,16 @@ SCORE: {число от 1 до 10}`
   _isTaskForAgent(task, roleIds) {
     if (!task.assignee) return false
     const assignee = task.assignee.toLowerCase().trim()
+    // Direct match against all role ID variants
     for (const id of roleIds) {
       if (assignee === id) return true
+    }
+    // Fallback: normalize the assignee to a canonical role ID and check
+    const normalized = normalizeAssignee(assignee)
+    if (normalized !== assignee) {
+      for (const id of roleIds) {
+        if (normalized === id) return true
+      }
     }
     return false
   }
@@ -1396,7 +1413,7 @@ SCORE: {число от 1 до 10}`
     // First: continue in_progress tasks (already started, needs to finish)
     const inProgress = allForAgent
       .filter(t => t.column === 'in_progress' && !t.frozen)
-      .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
+      .sort((a, b) => (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9))
     if (inProgress.length > 0) {
       console.log(`pickNextTask for role: ${agentRole} found in_progress: ${inProgress[0].id} "${inProgress[0].title}"`)
       return inProgress[0]
@@ -1405,7 +1422,7 @@ SCORE: {число от 1 до 10}`
     // Second: pick from todo by priority
     const todo = allForAgent
       .filter(t => t.column === 'todo' && !t.frozen)
-      .sort((a, b) => (priorityOrder[a.priority] || 9) - (priorityOrder[b.priority] || 9))
+      .sort((a, b) => (priorityOrder[a.priority] ?? 9) - (priorityOrder[b.priority] ?? 9))
 
     const picked = todo[0] || null
     console.log(`pickNextTask for role: ${agentRole} found: ${picked?.id || 'NONE'}${picked ? ` "${picked.title}"` : ''}`)

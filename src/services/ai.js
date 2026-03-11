@@ -1,4 +1,4 @@
-import { DESKS, resolveRoleId } from '../data/constants.js'
+import { DESKS, resolveRoleId, normalizeAssignee } from '../data/constants.js'
 import { promptBuilder, processMemoryTags } from './promptBuilder'
 
 // ─── Anthropic API config ───────────────────────────────────────────
@@ -41,6 +41,14 @@ export async function generateWorkspaceContent(project, team) {
     if (!res.ok) throw new Error(`API ${res.status}`)
 
     const data = await res.json()
+    // Normalize AI-generated task assignees to valid role IDs
+    if (data.tasks) {
+      const teamRoles = team.map(t => t.role || t.id)
+      data.tasks = data.tasks.map(t => ({
+        ...t,
+        assignee: normalizeAssignee(t.assignee) || teamRoles[0] || 'cto',
+      }))
+    }
     return data
   } catch (err) {
     console.warn('AI workspace generation unavailable, using fallback:', err.message)

@@ -31,11 +31,12 @@ Project:
 - Tech stack: ${project.techStack || 'React, Node.js'}
 
 Team: ${teamDesc}
+Team role IDs (use ONLY these as "assignee" values): ${team.map(t => t.role || t.id).join(', ')}
 
 Return ONLY valid JSON (no markdown, no explanation) with this structure:
 {
   "tasks": [
-    { "id": "t1", "title": "task title in Russian", "description": "brief description", "assignee": "role_id", "priority": "P0|P1|P2|P3", "column": "backlog|todo|in_progress", "tags": ["tag1"], "dueDate": null, "createdAt": "2024-01-01" }
+    { "id": "t1", "title": "task title in Russian", "description": "brief description", "assignee": "one of the team role IDs listed above", "priority": "P0|P1|P2|P3", "column": "backlog|todo|in_progress", "tags": ["tag1"], "dueDate": null, "createdAt": "2024-01-01" }
   ],
   "roadmap": [
     { "id": "r1", "phase": "Phase 1 — MVP", "color": "#6366f1", "start": 0, "duration": 3, "items": ["milestone1", "milestone2"] }

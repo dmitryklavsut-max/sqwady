@@ -224,6 +224,39 @@ const LEGACY_ID_MAP = {
 // Resolve role ID (supports old and new IDs)
 export const resolveRoleId = (id) => LEGACY_ID_MAP[id] || id
 
+// ── Label-to-ID reverse map (for AI-generated snake_case assignees) ──
+// Maps "backend_developer" → "backend", "growth_marketer" → "marketer", etc.
+const _labelToIdMap = {}
+ROLES.forEach(r => {
+  // "Backend Developer" → "backend_developer" → maps to "backend"
+  const snakeLabel = r.label.toLowerCase().replace(/[\/\s]+/g, '_')
+  _labelToIdMap[snakeLabel] = r.id
+  // Also without special chars: "UI/UX Designer" → "ui_ux_designer"
+  const cleanSnake = r.label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+  if (cleanSnake !== snakeLabel) _labelToIdMap[cleanSnake] = r.id
+})
+
+// Normalize any assignee string to a valid role ID
+// Handles: exact ID, legacy ID, snake_case label, spaced label
+export function normalizeAssignee(assignee) {
+  if (!assignee) return null
+  const a = assignee.toLowerCase().trim()
+  // 1. Exact match to a role ID
+  if (ROLES.find(r => r.id === a)) return a
+  // 2. Legacy ID resolution
+  if (LEGACY_ID_MAP[a]) return LEGACY_ID_MAP[a]
+  // 3. Snake_case label match (e.g. "backend_developer" → "backend")
+  if (_labelToIdMap[a]) return _labelToIdMap[a]
+  // 4. Try matching against labels directly (e.g. "backend developer")
+  const byLabel = ROLES.find(r => r.label.toLowerCase() === a)
+  if (byLabel) return byLabel.id
+  // 5. Partial match: if assignee contains a role ID or vice versa
+  const byPartial = ROLES.find(r => a.includes(r.id) || r.id.includes(a))
+  if (byPartial) return byPartial.id
+  // 6. No match — return as-is
+  return a
+}
+
 // ── DESKS — backward-compatible alias ───────────────────────────────
 // All code that uses DESKS.find(d => d.id === role) still works.
 // Includes legacy alias entries so old saved projects resolve correctly.
