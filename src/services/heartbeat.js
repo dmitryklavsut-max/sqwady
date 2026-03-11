@@ -429,33 +429,163 @@ ${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')
     }
   }
 
-  // Trigger: agent finished a task
-  async onTaskCompleted(taskId, onProgress) {
-    const { tasks, team } = this.state
-    const task = (tasks || []).find(t => t.id === taskId)
-    if (!task) return null
+  // Trigger: agent finished a task — recursive chain reaction
+  async onTaskCompleted(taskId, onProgress, _depth = 0) {
+    const MAX_CHAIN_DEPTH = 3
+    if (_depth >= MAX_CHAIN_DEPTH) return { results: [], tasksCreated: 0, tasksCompleted: 0, chainDepth: _depth }
 
-    // Find agents whose tasks depend on this one (same role or interacting roles)
+    const { tasks, team, project } = this.state
+    const task = (tasks || []).find(t => t.id === taskId)
+    if (!task) return { results: [], tasksCreated: 0, tasksCompleted: 0, chainDepth: _depth }
+
     const completedRole = task.assignee
+    const completedAgent = team.find(t => (t.role || t.id) === completedRole)
+    const completedName = completedAgent?.personality?.name || completedAgent?.label || completedRole
+    const completedDesk = DESKS.find(d => d.id === completedRole)
+
+    // Find dependent agents (who interact with the completed agent's role)
     const dependentAgents = team.filter(t => {
       const role = t.role || t.id
       if (role === completedRole) return false
-      // Poll agents who interact with the completed agent
       const interactions = t.position?.interactions || []
       return interactions.some(i => i.toLowerCase().includes(completedRole))
     })
 
-    // If no explicit dependencies, just poll the completing agent
     const agentsToPoll = dependentAgents.length > 0
-      ? dependentAgents
-      : team.filter(t => (t.role || t.id) === completedRole)
+      ? dependentAgents.slice(0, 3)
+      : []
+
+    if (agentsToPoll.length === 0) return { results: [], tasksCreated: 0, tasksCompleted: 0, chainDepth: _depth }
 
     const results = []
-    for (const agent of agentsToPoll.slice(0, 3)) {
-      const result = await this.pollAgent(agent, onProgress)
+    let totalTasksCreated = 0
+    let totalTasksCompleted = 0
+
+    for (const agent of agentsToPoll) {
+      if (this._aborted) break
+
+      const role = agent.role || agent.id
+      const agentName = agent.personality?.name || agent.label
+      const desk = DESKS.find(d => d.id === role)
+
+      // Contextual heartbeat prompt with chain context
+      const chainPrompt = `Задача "${task.title}" (${task.id}) завершена ${completedName} (${completedDesk?.label || completedRole}). Результат доступен.
+
+Какие твои следующие шаги? Есть ли задачи, которые теперь можно начать или завершить?
+${HEARTBEAT_SYSTEM_SUFFIX}`
+
+      const context = {
+        recentMessages: [],
+        project: project || {},
+        memoryFiles: this.state.memoryFiles || {},
+      }
+
+      if (onProgress) onProgress({ agentId: role, agentName, status: 'polling', chainDepth: _depth })
+
+      let responseText
+      try {
+        responseText = await chatWithAgent(agent, chainPrompt, context)
+      } catch {
+        responseText = generateMockHeartbeat(agent, tasks || [], project || {})
+      }
+      if (!responseText.includes('STATUS:')) {
+        responseText = generateMockHeartbeat(agent, tasks || [], project || {})
+      }
+
+      const parsed = parseHeartbeatResponse(responseText, role)
+      const result = { agentId: role, agentName, agentLabel: desk?.label, agentColor: desk?.color, chainDepth: _depth, ...parsed }
       results.push(result)
+
+      // Process completed tasks
+      for (const completed of parsed.completedTasks) {
+        const taskIdMatch = completed.match(/T-\d+/)
+        if (taskIdMatch) {
+          const existingTask = (this.state.tasks || []).find(t => t.id === taskIdMatch[0] && t.column !== 'done')
+          if (existingTask) {
+            this.dispatch({ type: 'UPDATE_TASK', payload: { id: existingTask.id, column: 'done' } })
+            totalTasksCompleted++
+
+            // Recursive chain reaction
+            const sub = await this.onTaskCompleted(existingTask.id, onProgress, _depth + 1)
+            if (sub) {
+              results.push(...sub.results)
+              totalTasksCreated += sub.tasksCreated
+              totalTasksCompleted += sub.tasksCompleted
+            }
+          }
+        }
+      }
+
+      // Create new tasks
+      for (const req of parsed.newTaskRequests) {
+        const currentTasks = this.state.tasks || []
+        const newId = `T-${String(currentTasks.length + 1).padStart(3, '0')}`
+        let assignee = req.assignTo
+        const matchDesk = DESKS.find(d => d.id === req.assignTo.toLowerCase() || d.label.toLowerCase() === req.assignTo.toLowerCase())
+        if (matchDesk) assignee = matchDesk.id
+        const hasRole = team.some(t => (t.role || t.id) === assignee)
+        if (!hasRole) assignee = role
+
+        this.dispatch({
+          type: 'ADD_TASK',
+          payload: {
+            id: newId,
+            title: req.title,
+            description: `Создано в цепной реакции после завершения "${task.title}" по запросу ${agentName} (${desk?.label || role}).`,
+            assignee,
+            priority: req.priority || 'P1',
+            column: 'todo',
+            tags: ['chain'],
+            dueDate: null,
+            createdAt: new Date().toISOString().slice(0, 10),
+          },
+        })
+        totalTasksCreated++
+      }
+
+      // Post to Meeting Room
+      const statusLines = [`🔗 **Цепная реакция** (уровень ${_depth + 1}): ${agentName} реагирует на завершение "${task.title}"`]
+      if (parsed.status) statusLines.push(`📊 ${parsed.status}`)
+      if (parsed.completedTasks.length > 0) statusLines.push(`✅ Завершено: ${parsed.completedTasks.join(', ')}`)
+      if (parsed.newTaskRequests.length > 0) statusLines.push(`➕ Новые: ${parsed.newTaskRequests.map(r => r.title).join('; ')}`)
+
+      this.dispatch({
+        type: 'ADD_MESSAGE',
+        payload: {
+          channel: 'meeting',
+          message: {
+            id: `chain-${Date.now()}-${role}`,
+            from: role,
+            name: agentName,
+            text: statusLines.join('\n'),
+            time: timestamp(),
+            heartbeat: true,
+          },
+        },
+      })
+
+      if (onProgress) onProgress({ agentId: role, agentName, status: 'done', result, chainDepth: _depth })
+
+      if (!this._aborted) await new Promise(r => setTimeout(r, 600))
     }
-    return results
+
+    // Update PROGRESS.md after chain
+    if (_depth === 0) {
+      const chainEntry = `## Цепная реакция — ${new Date().toLocaleString('ru-RU')}
+Триггер: "${task.title}" завершена ${completedName}
+Опрошено: ${results.length} агентов (глубина: ${Math.max(...results.map(r => r.chainDepth ?? 0)) + 1})
+Создано задач: ${totalTasksCreated}
+Завершено задач: ${totalTasksCompleted}
+${results.map(r => `- ${r.agentName} (${r.agentLabel}): ${r.status}`).join('\n')}
+`
+      const currentProgress = this.state.memoryFiles?.PROGRESS || ''
+      this.dispatch({
+        type: 'UPDATE_MEMORY_FILE',
+        payload: { key: 'PROGRESS', value: chainEntry + '\n' + currentProgress },
+      })
+    }
+
+    return { results, tasksCreated: totalTasksCreated, tasksCompleted: totalTasksCompleted, chainDepth: _depth }
   }
 
   // Manual cycle trigger

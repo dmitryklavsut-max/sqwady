@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { AppProvider, useApp, saveCurrentProject, loadProject, listProjects, getCurrentProjectId } from './context/AppContext'
+import { NotifyProvider } from './components/Notifications'
 import Landing from './pages/Landing'
 import ProjectSetup from './pages/ProjectSetup'
 import OfficeBuild from './components/OfficeBuild'
@@ -107,7 +108,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AppProvider>
-      <AppRoutes />
+      <NotifyProvider>
+        <AppRoutes />
+      </NotifyProvider>
     </AppProvider>
   )
 }

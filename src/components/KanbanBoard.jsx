@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { DndContext, useDroppable, useDraggable, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { Plus, X, Check, Trash2 } from 'lucide-react'
 import { KANBAN_COLS, KANBAN_NAMES, KANBAN_COLORS, PRIORITY_COLORS, DESKS } from '../data/constants'
 import { useApp } from '../context/AppContext'
+import { HeartbeatEngine } from '../services/heartbeat'
+import { useNotify } from './Notifications'
 import Button from './Button'
 
 const inputClass = 'w-full px-3 py-2.5 rounded-lg text-sm text-[var(--t)] bg-[var(--bg)] border border-[var(--bd)] outline-none focus:border-[var(--ac)] transition-colors'
@@ -280,6 +282,8 @@ function TaskModal({ task, isNew, team, onSave, onDelete, onClose }) {
 export default function KanbanBoard({ team }) {
   const { state, dispatch } = useApp()
   const tasks = state.tasks || []
+  const notify = useNotify()
+  const engineRef = useRef(null)
 
   const [modal, setModal] = useState(null) // { task, isNew }
   const [filter, setFilter] = useState('all')
@@ -290,6 +294,39 @@ export default function KanbanBoard({ team }) {
   )
 
   const filtered = filter === 'all' ? tasks : tasks.filter(t => t.assignee === filter)
+
+  const getEngine = useCallback(() => {
+    if (!engineRef.current) {
+      engineRef.current = new HeartbeatEngine(() => state, dispatch)
+    }
+    engineRef.current.getState = () => state
+    return engineRef.current
+  }, [state, dispatch])
+
+  const triggerChainReaction = useCallback(async (taskId, taskTitle) => {
+    if (!notify) return
+    notify('task_completed', `Задача "${taskTitle}" завершена!`)
+
+    const engine = getEngine()
+    const chainResult = await engine.onTaskCompleted(taskId, (update) => {
+      if (update.status === 'done' && update.result) {
+        const r = update.result
+        if (r.newTaskRequests.length > 0) {
+          notify('new_task', `${update.agentName} создал: ${r.newTaskRequests.map(t => t.title).join(', ')}`)
+        }
+        if (r.completedTasks.length > 0) {
+          notify('chain', `${update.agentName} завершил: ${r.completedTasks.join(', ')}`)
+        }
+        if (r.blockers.length > 0) {
+          notify('blocker', `${update.agentName}: ${r.blockers.join(', ')}`)
+        }
+      }
+    })
+
+    if (chainResult && chainResult.results.length > 0) {
+      notify('chain', `Цепная реакция: ${chainResult.results.length} агентов, +${chainResult.tasksCreated} задач`)
+    }
+  }, [getEngine, notify])
 
   const handleDragStart = (event) => {
     const task = event.active.data.current?.task
@@ -311,6 +348,11 @@ export default function KanbanBoard({ team }) {
     if (!task || task.column === newColumn) return
 
     dispatch({ type: 'UPDATE_TASK', payload: { id: taskId, column: newColumn } })
+
+    // Trigger chain reaction when task moved to done
+    if (newColumn === 'done' && task.column !== 'done') {
+      triggerChainReaction(taskId, task.title)
+    }
   }
 
   const handleSave = (taskData) => {
